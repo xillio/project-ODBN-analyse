@@ -1,0 +1,23 @@
+use Stream, String;
+
+function addLine(file, dataList, delimiter, enclosure) {
+    var list = [];
+     
+     
+    var preAndSuffix = "";
+    
+    // Add enclosure tags
+    if(enclosure){
+        preAndSuffix = "\"";
+    }
+    
+    foreach(data in dataList) {
+            list[] = preAndSuffix :: data :: preAndSuffix;
+    }
+     
+    // Join with delimiter
+    var line = String.join(list, delimiter);
+     
+    // Add to CSV
+    Stream.write(line :: "\n", file);
+}

@@ -1,0 +1,76 @@
+use Concurrency, System, Mongo, Collection, XURL, Date;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+argument data = Concurrency.testInput({}, []);
+
+var query = {
+    "size" : 1000,
+    "query" : {
+        "bool" : {
+            "filter": [
+                {
+                    "terms" : {
+                       "source" : data.repositories
+                     }
+                },
+                {
+                    "term" : {
+                        "type" : "Container"
+                    }   
+                }
+            ]
+        }    
+    }
+};
+
+var processing = true;
+
+var counter = 0;
+
+var containers = ElasticsearchHelpers->search(data.index, query, true, "30m", data.elasticsearch);
+
+while(processing){
+    
+    if(Collection.length(containers.body.hits.hits) == 0){
+        processing = false;
+    }
+        
+    foreach(hit in containers.body.hits.hits){
+        
+        if(counter % 1000 == 0)
+        {
+            Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed object(s): " :: counter}, data.output);
+        }
+    
+        var hasChildrenQuery = {
+            "size" : 0,
+            "query" : {
+                "bool" : {
+                    "must":{
+                        "match" : {
+                            "parent" : hit._source.hierarchy
+                        }   
+                    }
+                }    
+            }
+        };
+        
+        var hasChildrenResult = ElasticsearchHelpers->search(data.index, hasChildrenQuery, data.elasticsearch);
+        
+        
+        var analyticsHasChildren = true;
+        if(hasChildrenResult.body.hits.total.value == 0){
+            analyticsHasChildren =false;
+        }
+        
+        var hitUpdateObject = {"_id":hit._id, "_index":hit._index, "analyticsHasChildren":analyticsHasChildren};
+        Concurrency.push(hitUpdateObject, data.output);
+            
+        counter++;
+    }
+        
+    containers = ElasticsearchHelpers->scroll(containers.body._scroll_id, "30m", data.elasticsearch);
+}
+
+ElasticsearchHelpers->deleteScroll(containers.body._scroll_id, data.elasticsearch);

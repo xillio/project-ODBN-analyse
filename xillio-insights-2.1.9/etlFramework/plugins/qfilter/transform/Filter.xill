@@ -1,0 +1,68 @@
+// Description: filters queues based on one or more filters, currently only or filter are supported
+// Config usage:
+// {
+//        "filters" : {
+//              "filtername" : {"field":{"success":"%value%"},"type":"equals, startsWith, endsWith, contains, matches","value" : true}
+//        }
+// }
+
+use Concurrency, System, Mongo, Collection, XURL, String, Date;
+
+include etlFramework.plugins.qfilter.Helper as QfilterHelpers;
+
+argument data = Concurrency.testInput({}, []);
+
+var object = Concurrency.pop(data.input);
+
+while(object != null){
+    if(object.xillioType == "log"){
+        Concurrency.push(object, data.output);
+    }
+    else
+    {
+         do {
+            
+            var push = false;
+            foreach(qfilter in data.filters){
+                var valueToTest = QfilterHelpers->getFieldValue(object, qfilter.field);
+                
+                if(qfilter.type == "equals"){
+                    if(valueToTest == qfilter.value){
+                        push = true;
+                    }
+                }
+                else if(qfilter.type == "startsWith"){
+                    if(String.startsWith(valueToTest, qfilter.value)){
+                       push = true;
+                    }
+                }
+                else if(qfilter.type == "endsWith"){
+                    if(String.endsWith(valueToTest, qfilter.value)){
+                        push = true;
+                    }
+                }
+                else if(qfilter.type == "contains"){
+                    if(String.contains(valueToTest, qfilter.value)){
+                        push = true;
+                    }
+                }
+                else if(qfilter.type == "matches"){
+                    if(String.matches(valueToTest, qfilter.value)){
+                        push = true;
+                    }
+                }
+                
+                if(push == true){
+                    Concurrency.push(object, data.output);
+                } 
+            }
+            
+        }
+        fail(e){
+            Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+        }
+        
+    }
+    
+    object = Concurrency.pop(data.input);
+}

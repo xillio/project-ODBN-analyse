@@ -1,0 +1,253 @@
+{
+    "category" : [
+        {
+             "analyticsClassificationQuery" : {
+                "terms": {
+                  "binaryExtension.normal": ["doc","dot","docx","docm","dotx","dotm","docb","xls","xlt","xlm","xlsx","xlsm","xltx","sltm","xlsb","xla","xlam","xll","xlw","ppt","pot","pps","pptx","pptm","potx","potm","ppam","ppsx","ppsm","sldx","sldm","vsd","vsdx"]
+                }
+              },
+              "analyticsClassificationResult" : "office"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                "terms": {
+                  "binaryExtension.normal": ["pdf","ppdf","pdfx","pdf_","_pdf","epdf","pdfxml"]
+                }
+              },
+              "analyticsClassificationResult" : "pdf"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                "terms": {
+                  "binaryExtension.normal": ["vcf","eml","rpmsg","msf","mht","pst","vcard","msg","dbx","emix","mbox","ldif","rcv","emlx","vrge08message","mso","nws","mab","mbs","oas","gwi","list","mlm","sbd","wdseml","mbx","tbb","pbx","ezm","box","pmm","boe","pmi","msb","ldi","p10","tnf","agt","mail","bri","cnm","mau","pmx","mailhost","pop","pm1","maildb","smd","mbg","mozeml","pmx","outlook97","smp","gmp","pml","mmdf","vrge08contact","schd","pmc","vrge08event","cnm","pop","pm3","idb","bina","asv","vrge08group","vrge08note","bdf"]
+                }
+              },
+              "analyticsClassificationResult" : "email"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                "terms": {
+                  "binaryExtension.normal": ["264","3g2","3gp","asf","asx","avi","bik","dash","dat","dvr","flv","h264","m2t","m2ts","m4v","mkv","mod","mov","mp4","mpeg","mpg","mswmm","mts","ogv","prproj","rec","rmvb","swf","tod","tp","ts","vob","webm","wmv"]
+                }
+              },
+              "analyticsClassificationResult" : "video"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                "terms": {
+                  "binaryExtension.normal": ["bmp","dib","dt2","emf","gif","ico","icon","jpeg","jpg","pcx","pic","png","psd","tga","thm","tif","tiff","wbmp","wdp","webp","arw","cr2","crw","dcr","dng","fpx","mrw","nef","orf","pcd","ptx","raf","raw","rw2","ai","cdr","csh","drw","emz","odg","sda","svg","wmf"]
+                }
+              },
+              "analyticsClassificationResult" : "image"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                "terms": {
+                  "binaryExtension.normal": ["3ga","aac","aiff","amr","ape","asf","cda","dvf","flac","gp4","gp5","gpx","logic","m4a","m4b","m4p","midi","mp3","ogg","pcm","snd","sng","uax","wav","wma","wpl"]
+                }
+              },
+              "analyticsClassificationResult" : "audio"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                "terms": {
+                  "binaryExtension.normal": ["1st","alx","asp","csv","eng","htm","html","log","lrc","lst","nfo","opml","plist","pts","reg","rep","rtf","srt","sub","tbl","text","txt","xml","xsd","xsl","xslt"]
+                }
+              },
+              "analyticsClassificationResult" : "text"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                "terms": {
+                  "binaryExtension.normal": ["azw","azw3","cbr","cbz","epub","fb2","iba","ibooks","lit","mobi"]
+                }
+              },
+              "analyticsClassificationResult" : "ebook"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                "terms": {
+                  "binaryExtension.normal": ["ova","ovf","pvm","vdi","vhd","vmdk","vmem","vmwarevm","vmx"]
+                }
+              },
+              "analyticsClassificationResult" : "virtualization"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                "terms": {
+                  "binaryExtension.normal": ["001","002","003","004","005","006","007","008","009","010","7z","7zip","a00","a01","a02","a03","a04","a05","ace","apk","appxbundle","arc","arj","asec","bar","c00","c01","c02","c03","cab","cbz","cso","dlc","gz","gzip","hqx","inv","ipa","isz","msu","nbh","pak","r00","r01","r02","r03","r04","r05","r06","r07","r08","r09","r10","rar","rpm","sis","sisx","sit","sitd","sitx","tar","tgz","uax","webarchive","xap","z01","z02","z03","z04","z05","zip"]
+                }
+              },
+              "analyticsClassificationResult" : "compressed"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                "terms": {
+                  "binaryExtension.normal": ["dwfx","dwg","dxf","3ds","dct","dgn"]
+                }
+              },
+              "analyticsClassificationResult" : "autocad"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                "terms": {
+                  "binaryExtension.normal": ["accdb","accdt","db","dbf","fdb","gdb","idx","mdb","mdf","msmessagestore","sdf","sql","sqlite","wdb"]
+                }
+              },
+              "analyticsClassificationResult" : "database"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                "terms": {
+                  "binaryExtension.normal": ["air","app","application","appx","bat","bin","com","cpl","deb","dll","elf","exe","jar","js","lnk","msi","prg","rpm","shs","vbs","xap"]
+                }
+              },
+              "analyticsClassificationResult" : "executables"
+        }
+    ],
+    "sizeDistribution" : [
+         {
+             "analyticsClassificationQuery" : {
+                "range": {
+                  "binaryByteSize" : {
+                      "gte" : 0,
+                      "lte" : 1024
+                  }
+                }
+              },
+              "analyticsClassificationResult" : "<= 1 kB"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                 "range": {
+                  "binaryByteSize" : {
+                      "gte" : 1024,
+                      "lte" : 10240
+                  }
+                }
+              },
+              "analyticsClassificationResult" : "<= 10 kB"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                 "range": {
+                  "binaryByteSize" : {
+                      "gte" : 10240,
+                      "lte" : 102400
+                  }
+                }
+              },
+              "analyticsClassificationResult" : "<= 100 kB"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                 "range": {
+                  "binaryByteSize" : {
+                      "gte" : 102400,
+                      "lte" : 1048576
+                  }
+                }
+              },
+              "analyticsClassificationResult" : "<= 1 MB"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                 "range": {
+                  "binaryByteSize" : {
+                      "gte" : 1048576,
+                      "lte" : 10485760
+                  }
+                }
+              },
+              "analyticsClassificationResult" : "<= 10 MB"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                 "range": {
+                  "binaryByteSize" : {
+                      "gte" : 10485760,
+                      "lte" : 104857600
+                  }
+                }
+              },
+              "analyticsClassificationResult" : "<= 100 MB"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                 "range": {
+                  "binaryByteSize" : {
+                      "gte" : 104857600,
+                      "lte" : 1073741824
+                  }
+                }
+              },
+              "analyticsClassificationResult" : "<= 1 GB"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                 "range": {
+                  "binaryByteSize" : {
+                      "gte" : 1073741824,
+                      "lte" : 10737418240
+                  }
+                }
+              },
+              "analyticsClassificationResult" : "<= 10 GB"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                 "range": {
+                  "binaryByteSize" : {
+                      "gte" : 10737418240,
+                      "lte" : 107374182400
+                  }
+                }
+              },
+              "analyticsClassificationResult" : "<= 100 GB"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                 "range": {
+                  "binaryByteSize" : {
+                      "gte" : 107374182400,
+                      "lte" : 1099511627776
+                  }
+                }
+              },
+              "analyticsClassificationResult" : "<= 1 TB"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                 "range": {
+                  "binaryByteSize" : {
+                      "gte" : 1099511627776,
+                      "lte" : 10995116277760
+                  }
+                }
+              },
+              "analyticsClassificationResult" : "<= 10 TB"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                 "range": {
+                  "binaryByteSize" : {
+                      "gte" : 10995116277760,
+                      "lte" : 109951162777600
+                  }
+                }
+              },
+              "analyticsClassificationResult" : "<= 100 TB"
+        },
+        {
+             "analyticsClassificationQuery" : {
+                 "range": {
+                  "binaryByteSize" : {
+                      "gte" : 109951162777600,
+                      "lte" : 1125899906842624
+                  }
+                }
+              },
+              "analyticsClassificationResult" : "<= 1 PB"
+        }
+    ]
+}

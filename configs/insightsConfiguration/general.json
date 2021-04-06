@@ -1,0 +1,35 @@
+{
+   "includedRepositories" : [],
+   "excludedRepositories" : [],
+   "analysisRepositories" : [],
+   "enabledAnalysisTypes" : [
+       "classification",
+       "structure", 
+       "structureperyear", 
+       "duplicate", 
+       "emptycontainer", 
+       "sameparent", 
+       "links"
+       ],
+   "elasticsearch":{
+      "host":"http://localhost:9200",
+      "username":"elastic",
+      "password":"elastic",
+      "authenticationEnabled":false
+   },
+   "kibana":{
+      "host":"http://localhost:5601",
+      "username":"elastic",
+      "password":"elastic",
+      "authenticationEnabled":false
+   },
+   "mongo" : {
+        "port":27017,
+        "host":"localhost",
+        "username":"",
+        "password":"",
+        "name":"udm_odbn",
+        "collection":"documents"
+    },
+   "tempPath" : "e:/temp"
+}

@@ -1,0 +1,30 @@
+use Concurrency, System, Mongo, Collection, XURL, Date;
+
+include etlFramework.plugins.mongo.Helper as MongoHelpers;
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+argument data = Concurrency.testInput({}, []);
+
+var object = Concurrency.pop(data.input);
+
+while(object != null){
+   if(object.xillioType == "log" && data.showObject == true){
+        System.print("Robot: " :: object.xillioRobot :: ", message: " :: object.xillioMessage :: ", object: " :: object.xillioObject, object.xillioSubtype);
+   }
+   else if(object.xillioType == "log")
+   {
+        if(object.xillioRobot != null){
+            System.print("Robot: " :: object.xillioRobot :: ", message: " :: object.xillioMessage, object.xillioSubtype);
+        }
+        else
+        {
+            System.print("Message: " :: object.xillioMessage, object.xillioSubtype);
+        }
+   }
+   else
+   {
+       ElasticsearchHelpers->update(object._id, {"doc":{"cleanResult":object.result, "cleanMessage":object.message}}, object._index, data.elasticsearch);
+   }
+   object = Concurrency.pop(data.input);
+}
+

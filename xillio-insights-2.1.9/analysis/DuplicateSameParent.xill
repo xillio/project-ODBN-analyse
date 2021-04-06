@@ -1,0 +1,130 @@
+use Concurrency, System, Mongo, Collection, XURL, Date;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+argument data = Concurrency.testInput({}, []);
+
+var query = {
+    "size" : 0,
+    "query" : {
+        "bool" : {
+            "filter" : [
+                {
+                    "terms" : {
+                        "source" : data.repositories
+                    }
+                },
+                {
+                    "term" : {
+                        "reversedVersionOrder" : 1
+                    }
+                }
+            ]
+        }
+    },
+    "aggs" : {
+        "parentAndHashes": {
+            "composite" : {
+            	"size" : 1000,
+                "sources" : [
+                    { "parent": { "terms" : { "field": "parent" } } },
+                    { "hash": { "terms" : { "field": "binaryHash" } } }
+                ]
+            },
+            "aggs": {
+              "filter": {
+                "bucket_selector": {
+                  "buckets_path": {
+                    "doc_count": "_count"
+                  },
+                  "script": "params.doc_count > 1"
+                }
+             }
+          }
+        }
+    }
+};
+
+var processing = true;
+
+var counter = 0;
+
+while(processing){
+    var parentAndHashes = ElasticsearchHelpers->search(data.index, query, data.elasticsearch);
+    
+    foreach(parentAndHash in parentAndHashes.body.aggregations.parentAndHashes.buckets){
+        
+        if(counter % 1000 == 0)
+        {
+            Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed duplicate(s): " :: counter}, data.output);
+        }
+        
+        var dupQuery = {
+            "size" : 1000,
+            "query": {
+                "bool": {
+                  "filter": [
+                   {
+                        "term" : {
+                            "reversedVersionOrder" : 1
+                        }
+                    },
+                    {
+                      "term": {
+                        "parent": parentAndHash.key.parent
+                      }
+                    },
+                    {
+                      "term": {
+                        "binaryHash": parentAndHash.key.hash
+                      }
+                    }
+                  ]
+                }
+            },
+        };
+        
+        var subProcessing = true;
+        
+        var duplicates = ElasticsearchHelpers->search(data.index, dupQuery, true, "30m", data.elasticsearch);
+        
+        var hash;
+        var parent;
+        
+        while(subProcessing){
+            
+            if(Collection.length(duplicates.body.hits.hits) == 0){
+                subProcessing = false;
+            }
+            
+            foreach(count, duplicate in duplicates.body.hits.hits){
+                
+                var duplicateUpdateObject;
+                if(hash != duplicate._source.binaryHash || parent != duplicate._source.parent){
+                    hash = duplicate._source.binaryHash;
+                    parent = duplicate._source.parent;
+                    duplicateUpdateObject = {"_id":duplicate._id, "_index":duplicate._index, "analyticsBinaryParentUnique" :true};
+                }
+                else
+                {
+                    duplicateUpdateObject = {"_id":duplicate._id, "_index":duplicate._index, "analyticsBinaryParentUnique" :false};
+                }
+                
+                Concurrency.push(duplicateUpdateObject, data.output);   
+            }
+            
+            duplicates = ElasticsearchHelpers->scroll(duplicates.body._scroll_id, "30m", data.elasticsearch);
+        }
+        
+        ElasticsearchHelpers->deleteScroll(duplicates.body._scroll_id, data.elasticsearch);
+        
+        counter++;
+    }
+    
+    if(parentAndHashes.body.aggregations.parentAndHashes.after_key != null){
+        query.aggs.parentAndHashes.composite.after = parentAndHashes.body.aggregations.parentAndHashes.after_key;
+    }
+    else{
+        processing = false;
+    }
+}

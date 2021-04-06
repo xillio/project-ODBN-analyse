@@ -1,0 +1,129 @@
+use Concurrency, System, Mongo, Collection, XURL, Date;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+argument data = Concurrency.testInput({"index":"insights_default*",  "elasticsearch":{
+      "host":"http://localhost:9200",
+      "username":"elastic",
+      "password":"testtest",
+      "authenticationEnabled":true
+   }}, []);
+
+var query = {
+    "size" : 0,
+    "query" : {
+        "bool" : {
+            "filter" : [
+                {
+                    "term" : {
+                        "reversedVersionOrder" : 1
+                    }
+                },
+                {
+                  "exists" : {
+                    "field" : "language"
+                  }
+                }
+            ]
+        }
+    },
+    "aggs" : {
+        "ids": {
+            "composite" : {
+            	"size" : 1000,
+                "sources" : [
+                    { "id": { "terms" : { "field": "id" } } }
+                ]
+            }
+        }
+    }
+};
+
+var processing = true;
+
+var counter = 0;
+
+while(processing){
+    var documents = ElasticsearchHelpers->search(data.index, query, data.elasticsearch);
+    
+    foreach(document in documents.body.aggregations.ids.buckets){
+    
+        if(counter % 1000 == 0)
+        {
+            Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed duplicate(s): " :: counter}, data.output);
+        }
+        
+        counter++; 
+        
+        var langQuery = {
+              "size" : 1000,
+              "query" : {
+                "bool" : {
+                    "filter" : [
+                        {
+                            "term" : {
+                                "reversedVersionOrder" : 1
+                            }
+                        },
+                        {
+                          "exists" : {
+                            "field" : "language"
+                          }
+                        },
+                        {
+                            "term": {
+                                    "id": {
+                                        "value": document.key.id
+                                }
+                            }
+                        }
+                    ]
+                }             
+              },
+              "aggs": {
+                "sources": {
+                  "terms": {
+                    "field": "language",
+                    "size": 25
+                  }
+                }
+              } 
+        };
+        
+        var subProcessing = true;
+        
+        var languages = ElasticsearchHelpers->search(data.index, langQuery, true, "30m", data.elasticsearch);
+        
+        var translationList = [];
+        
+        foreach(lang in languages.body.aggregations.sources.buckets){
+            translationList [] = lang.key;
+        }
+        
+        
+        while(subProcessing == true){
+            if(Collection.length(languages.body.hits.hits) == 0){
+                subProcessing = false;
+            }
+            
+            foreach(hit in languages.body.hits.hits){
+                
+                
+                var hitUpdateObject = {"_id":hit._id, "_index":hit._index, "analyticsTranslationCount" : Collection.length(translationList), "analyticsAvailableTranslations":translationList};
+                
+                Concurrency.push(hitUpdateObject, data.output);
+            }
+            
+            languages = ElasticsearchHelpers->scroll(languages.body._scroll_id, "30m", data.elasticsearch);
+        }
+        
+        ElasticsearchHelpers->deleteScroll(languages.body._scroll_id, data.elasticsearch);
+    }
+    
+    if(documents.body.aggregations.ids.after_key != null){
+        query.aggs.ids.composite.after = documents.body.aggregations.ids.after_key;
+    }
+    else{
+        processing = false;
+    }
+}

@@ -1,0 +1,83 @@
+// Description: writes an Excel sheet with the results, the receiving objects should already contain the right structure for the Excel sheet
+// Config usage:
+// {
+//      "templatePath" : path to the template to use
+//      "sheetName" : name of the sheet to use or create
+//      "startRow" : number of the row to start writing
+//      "targetPath" : path to save the result
+// }
+
+use Concurrency, System, Excel, Collection, Date, Assert;
+
+include etlFramework.plugins.excel.Helper as ExcelHelpers;
+
+argument data = Concurrency.testInput({}, []);
+
+var wb;
+var sheet;
+var row;
+
+init();
+
+var object = Concurrency.pop(data.input);
+
+while(object != null){
+    if(object.xillioType == "log"){
+        Concurrency.push(object, data.output);
+    }
+    else
+    {  
+        execute(object, data, false);
+    }
+    
+    object = Concurrency.pop(data.input);
+}
+
+do {
+    Excel.save(wb, data.targetPath);
+}
+fail(e){
+    Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+}
+
+function execute(object, data, assert)
+{
+   do
+   {
+        row++;
+        var column = 1;
+        foreach(key, value in object){
+            column++;
+            Excel.setCellValue(sheet, column, row, value);
+        }
+   }
+   fail(e)
+   {
+       
+       
+       // Checks the assert value for true or false. When extending the functionality of the function, set to true so you can implement your own error handeling.
+       if(assert){
+           Assert.error(e.message);
+       }
+       else
+       {
+           Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+       }
+   }
+   
+}
+
+private function init(){
+    if(data.templatePath == null){
+        wb = Excel.createWorkbook(data.targetPath);
+        sheet = Excel.createSheet(wb, data.sheetName);
+    }
+    else
+    {
+        wb = Excel.loadWorkbook(data.templatePath);
+        sheet = Excel.loadSheet(wb, data.sheetName);
+    }
+    
+    row = data.startRow;
+
+}

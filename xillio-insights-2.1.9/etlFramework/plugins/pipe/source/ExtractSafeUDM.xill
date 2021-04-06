@@ -1,0 +1,293 @@
+// Description: function to control Xillio PIPE
+// Config usage:
+// {
+//        "xillioPipe" : object containg Xillio PIPE settings {"host":"http://localhost:5050"},
+//        "pipeline" : name of the pipeline to control
+//        "path" : path to the results of the pipeline
+//        "startPipeline" : specifies whenether to start the pipeline or only process the results
+//        "source" : name of the source, for example livelink,
+//        "toUdm" : specififies whenether to format the object to the udm
+// }
+
+use XURL, System, File, Stream, Concurrency, Date, String, Collection, Hash;
+
+include etlFramework.plugins.pipe.Helper as PipeHelpers;
+
+argument data = Concurrency.testInput({}, []);
+
+var pipelineStatus;
+var processedFiles = {};
+var monitoring = true;
+
+init();
+
+if(data.startPipeline == true){
+    var result = XURL.post(data.xillioPipe.host :: "/api/pipelines/" :: data.pipeline :: "/start", {}, {});
+    
+    if(String.startsWith(result.status.code, "2") == true){
+        pipelineStatus = "RUNNING";
+    }
+}
+else
+{
+    monitoring = false;
+}
+
+do {
+
+    while(monitoring){
+    
+        var files = File.iterateFiles(data.path, true);
+    
+        foreach(counter, file in files){
+            processFile(file, false);  
+        }
+        
+        var status = XURL.get(data.xillioPipe.host :: "/api/pipelines", {});
+        foreach(pipeline in status.body){
+            if(pipeline.name == data.pipeline){
+                pipelineStatus = pipeline.status;
+            }
+        }
+        
+        if(pipelineStatus != "RUNNING"){
+            monitoring = false;
+        }
+    }
+    
+    // check final files
+    var files = File.iterateFiles(data.path, true);
+    foreach(counter, file in files){
+        processFile(file, true);  
+    }
+
+
+}
+fail(e){
+        Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":null}, data.output);
+}
+
+private function processFile(file, final){
+     
+    file = normalizePath(file);
+    if(processedFiles[file] == null){
+        
+        do {
+            var lastSlash = String.lastIndexOf(file, "/") + 1;
+            
+            var fileName = String.substring(file, lastSlash, String.length(file));
+            var fileCounter = String.replace(fileName,"[^\\d]","");
+            fileCounter++;
+            
+            if(File.exists(String.replace(file, fileName, String.replace(fileName, "[\\d]+", fileCounter))) == false && final == false){
+                continue;
+            }
+            
+            processedFiles[file] = file;
+                
+            Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processing: " :: file}, data.output);
+            
+        }
+        fail(e){
+            Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":file}, data.output);
+        }
+    
+       
+        var fileStream = File.openRead(file);
+        var i=0;
+        foreach(jsonLine in Stream.iterate(fileStream)){
+            var sourceObject ="";
+            i++;
+            do{
+                sourceObject = System.parseJSON(jsonLine);
+            }
+            
+            fail(error){
+                
+               Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"WARNING","xillioRobot":System.info().robotUrl,"xillioMessage": error.message, "xillioObject":jsonLine}, data.output);
+            }
+            success{
+
+                var object ={};
+                if (sourceObject.properties["additional-metadata"]){
+                    var elements = sourceObject.properties["additional-metadata"];
+                    var newElements= {};
+                   
+                    var i=0;
+                    foreach (key,value in elements){
+                        var metadataObj = {"name":"","value":""};
+                        metadataObj.name = key;
+                        metadataObj.value= value;
+                       
+                        newElements[i]= metadataObj;
+                        i++;
+                    }
+
+                    sourceObject.properties["additional-metadata"] = newElements;
+                }
+               
+                if(data.toUdm == true){
+                    object = toUdm(sourceObject);
+                }else{
+                    object = sourceObject;
+                }
+                object._id = sourceObject.path;
+                object.index = data.index;
+                object.source = data.source;
+                Concurrency.push(object, data.output);
+            }
+            finally {}
+        }    
+    }
+}
+
+
+/*
+// obsulete function as metadata keynames are now stores as value in a seperate element
+private function saveKeyName(elementName){
+    var newElementName = "";
+    newElementName =  String.replace(elementName,"[\\.\\$]","_",true,true);
+    newElementName =  String.replace(newElementName,"[\\u0000]","",true,true);
+    if(newElementName != elementName){System.print("element: "::elementName::" modified to: " ::newElementName,"DEBUG");}
+    return newElementName;
+}
+*/
+
+
+private function toUdm(object){
+    
+    if(object["success"] == true){
+        var udm = parseDocument(object);
+        object = PipeHelpers->setFieldValue(object, PipeHelpers->prepareField({"udm":"%value%"}, udm)); 
+    }
+    
+    else
+    {
+        object = parseError(object);
+        object;
+    }
+    
+    return object;
+}
+
+private function parseDocument(object){
+    object.path = normalizePath(object.path);
+    
+    var formatted = {};
+    
+    formatted._id = Hash.toMD5(object.path);
+    formatted.id = object.path;
+    formatted.reversedVersionOrder = 1;
+    formatted.versionCount = 1;
+    formatted.type = "Document";
+    formatted.subType = "File";
+	formatted.isFile = true;
+    
+    if(object.properties.isDirectory == true)
+    {
+        formatted.type = "Container";
+        formatted.subType = "Folder";
+        formatted.isFile = false;
+    }
+    
+    formatted.source = object.source;
+    formatted.name = pathToName(object.path);
+    formatted.state = [];
+    
+        
+    // add hidden decorators
+    if(object.properties.isHidden == true){
+        formatted.state[] = "hidden";
+    }
+    
+    formatted.hierarchy = object.path;
+    formatted.parent = getParentFromHierarchy(formatted.hierarchy);
+    
+    formatted.dateCreated = object.properties.creationTime;
+    formatted.dateModified = object.properties.lastModifiedTime;
+    formatted.dateAccessed = object.properties.lastAccessTime;
+    
+    if(formatted.type == "Document"){
+        formatted.binaryExtension = pathToExtension(object.path);
+        formatted.binaryByteSize = object.properties.size;
+        formatted.binaryByteSizeAsNumber = object.properties.size;
+        if(object.properties.MD5 != null){
+            formatted.binaryHash = object.properties.MD5;
+        }
+        else if(object.properties.quickxorhash != null){
+            formatted.binaryHash = object.properties.quickxorhash;
+        }
+    }
+    
+    formatted.language = "undefined";    
+    formatted.isOriginalLanguage = true;
+    formatted.deletedFromSource = false;
+    
+   
+    
+    return formatted;
+        
+}
+
+private function parseError(object){
+    var parsedError = {
+        "timestamp" : Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"),
+        "xillioType" : "log",
+        "xillioSubtype" : "error",
+        "xillioMessage" : object.auditLog[0].exception.type,
+        "xillioObject" : object.path
+    };
+    
+    return parsedError;
+}
+
+private function normalizePath(path){
+    return String.replace(path,"\\","/", false, true, 0);
+}
+
+function pathToName(path) {
+     path = String.replace(path, "(.*[/])(.*)", "$2");
+     path = String.replace(path, "(\\.[\\-0-9a-zA-Z]+)$", "");
+     return path;
+}
+
+function pathToExtension(path) {
+     var ext = String.replace(path, "(.*)([/])(.*\\.)([/-0-9a-zA-Z]+)$", "$4");
+     // required because Xill returns the entire string if no match is found!
+     if (String.length(ext) == String.length(path)) {
+          ext = null;
+     }
+     return (ext);
+}
+
+private function getParentFromHierarchy(hierarchy){
+    return String.replace(hierarchy, "(.*)\\/.*", "$1", true);
+}
+
+private function init(){
+    if(data.xillioPipe == null){
+        data.xillioPipe = {
+                "host" : "http://localhost:5050"
+        };
+    }
+    
+    if(data.pipeline == null){
+        data.pipeline = "scraper";
+    }
+    
+    if(data.path == null){
+        data.path = "c:/insights/pipeOutput/scraper";
+    }
+    
+    if(data.startPipeline == null){
+        data.startPipeline = true;
+    }
+    
+      if(data.source == null){
+        data.source = "Fileshare";
+    }
+    
+    if(data.toUdm == null){
+        data.toUdm = true;
+    }
+}

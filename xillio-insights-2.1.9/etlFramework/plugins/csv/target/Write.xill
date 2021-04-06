@@ -1,0 +1,78 @@
+// Description: writes an Excel sheet with the results, the receiving objects should already contain the right structure for the Excel sheet
+// Config usage:
+// {
+//      (optional) "addHeader" : true // specifies if headers are written to the csv file, defaults to true
+//      (optional) "addEnclosure" : false // specifies if fields should be double qouted, defaults to false
+//      (optional) "delimiter" : the delimiter to use, defaults to ;
+//      (optional) "targetPath" : // path to save the result
+// }
+
+use Concurrency, System, Excel, Collection, Date, File, Assert;
+
+include etlFramework.plugins.csv.Helper as CsvHelpers;
+
+argument data = Concurrency.testInput({}, []);
+
+var file;
+var lineNo = 0;
+
+init();
+
+var object = Concurrency.pop(data.input);
+
+while(object != null){
+    if(object.xillioType == "log"){
+        Concurrency.push(object, data.output);
+    }
+    else
+    {  
+        execute(object, data, false);
+    }
+    
+    object = Concurrency.pop(data.input);
+}
+
+function execute(object, data, assert)
+{
+   do
+   {
+        if(lineNo == 0 && data.addHeader){
+            var header = CsvHelpers->objectToList(object, "key");
+            CsvHelpers->addLine(file, header, data.delimiter, data.addEnclosure);
+            lineNo++;
+        }
+       
+        var row = CsvHelpers->objectToList(object, "value");
+        CsvHelpers->addLine(file, row, data.delimiter, data.addEnclosure);
+        
+   }
+   fail(e)
+   {
+       
+       // Checks the assert value for true or false. When extending the functionality of the function, set to true so you can implement your own error handeling.
+       if(assert){
+           Assert.error(e.message);
+       }
+       else
+       {
+           Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+       }
+   }
+   
+}
+
+private function init(){
+    file = File.openWrite(data.targetPath);
+    
+    if(data.addEnclosure == null){
+        data.addEnclosure = false;
+    }
+    
+    if(data.delimiter == null){
+        data.delimiter = ",";
+    }
+    
+    if(data.addHeader == null){
+        data.addHeader = true;
+    }
+}

@@ -1,0 +1,86 @@
+// Description: scrambles the data in the specified fields
+// Config usage:
+// {
+//      "fields":{
+//            "_id":{"field":{"_id":"%value%"},"type":"path"}, specify a field name, a path to the field and if the field contains a path
+//            "parent":{"field":{"original":{"parent":{"id":"%value%"}}}},
+//        },
+//        "delimiter": delimiter for path fields
+//        "minLenght" : minLenght of the hash for path fields. By default the length of part that is taken from the hash equals the lenght of the input. With short file/folder names this might lead to duplicates. Set a higher minLenght to avoid this.
+// }
+
+
+use Concurrency, File, Stream, Hash, System, String, Date;
+
+include etlFramework.plugins.scrambler.Helper as simpleScramblerHelpers;
+
+argument data = Concurrency.testInput({},[] );
+
+var object = Concurrency.pop(data.input);
+
+while(object != null){
+    if(object.xillioType == "log"){
+        Concurrency.push(object, data.output);
+    }
+    else
+    {   
+        do {
+            
+            foreach(field in data.fields){
+                var valueToReplace = simpleScramblerHelpers->getFieldValue(object, field.field);
+                if(valueToReplace != null){
+
+                    if(field.type == "path"){
+                        valueToReplace = hashPath(valueToReplace, data.delimiter, data.minLenght);
+                    }
+                    else
+                    {
+                        valueToReplace = partialHash(valueToReplace, data.minLenght);    
+                    }
+                    
+                    object = simpleScramblerHelpers->setFieldValue(object, simpleScramblerHelpers->prepareField(field.field, valueToReplace));
+                }
+                
+            }
+            
+            Concurrency.push(object, data.output);
+        }
+        fail(e){
+            Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+        }
+    }
+    
+    object = Concurrency.pop(data.input);
+}
+
+
+private function hashPath(path, delimiter, minLenght){
+    var hashedPath = "";
+
+    var splittedPath = String.split(path, delimiter, false);
+    
+    foreach(counter, path in splittedPath){
+        
+        if(counter == 0){
+            hashedPath ::= path;
+            continue;
+        }
+        
+        path = partialHash(path, minLenght);
+        hashedPath ::= "\\" ::path;
+
+    }
+    
+    return hashedPath;
+}
+
+private function partialHash(string, minLenght){
+    var length = String.length(string);
+    if(length > 32){
+        length = 32;
+    }
+    else if(length < minLenght){
+        length = minLenght;
+    }
+    return String.substring(Hash.toMD5(string), 0, length);
+}

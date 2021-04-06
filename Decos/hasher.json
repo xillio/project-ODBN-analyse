@@ -1,0 +1,34 @@
+{
+  "modules": {
+    "getFiles": {
+      "type": "jsonlineReader",
+      "filePrefix": "files",
+      "outputTo": [
+        "hasher"
+      ]
+    },
+    "getFolders": {
+      "type": "jsonlineReader",
+      "filePrefix": "folders",
+      "outputTo": [
+        "output"
+      ]
+    },
+    "hasher": {
+      "type": "hasher",
+      "perCore": true,
+      "concurrency": 1,
+      "hashes": [
+        "MD5",
+        "SHA-1",
+        "SHA-256"
+      ],
+      "outputTo": [
+        "output"
+      ]
+    },
+    "output": {
+      "type": "jsonlineWriter"
+    }
+  }
+}

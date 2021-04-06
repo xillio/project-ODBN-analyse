@@ -1,0 +1,8 @@
+use Mongo;
+
+include etlFramework.plugins.mongo.Helper as MongoHelpers;
+
+function updateOne(collection, query, update, upsert, mongo){
+    var connection = MongoHelpers->getConnection(mongo);
+    Mongo.updateOne(collection, query, update, {"upsert":upsert}, connection);
+}

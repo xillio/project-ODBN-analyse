@@ -1,0 +1,8 @@
+use Mongo;
+
+include etlFramework.plugins.mongo.Helper as MongoHelpers;
+
+function replaceOne(object, collection, query, upsert, mongo){
+    var connection = MongoHelpers->getConnection(mongo);
+    Mongo.replaceOne(collection, query, object, {"upsert":upsert} ,connection);
+}

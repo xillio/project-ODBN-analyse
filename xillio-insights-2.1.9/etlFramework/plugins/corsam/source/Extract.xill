@@ -1,0 +1,350 @@
+// Description: extracts attachments related to workflows or documents from Exact Synergy
+// Config usage:
+// {
+//      "mongo" : object containing the Mongo settings {"name" : "livelink", "host" : "localhost", "port" : 27017, "username" : null, "password" : null}
+//      (optional) "mongoOptions" : // object containing the options for the Mongo connection
+//      (optional) "collection" : the name of the collection that contains the livelink documents
+//      (optional) "query" : a query to select/filter the objects from Mongo
+//      (optional) "hashing" : object containg hashing settings"hashing" : {"enabled" : false,"versions" : false}
+//      (optional) "source" : name of the source, for example livelink,
+//      (optional) "toUdm" : specififies whenether to format the object to the udm,
+//      "pathParsers":[{"regex":"C:\\\\(.*)","replacement":"Z:\\\\$1"}], array of path parsers to resolve the binaryPath relative to the server
+//      "accessTypes" : ["Fetch","View","Create","PermChange"], list of audit types that are considered access to an object
+// }
+
+use Concurrency, System, Mongo, Collection, File, Stream, Date, String;
+
+include etlFramework.plugins.corsam.Helper as CorsamHelpers;
+
+argument data = Concurrency.testInput({"collection":"documents","query":{}, "mongo":{"host":"localhost","name":"udm_corsaALL", "port":"27017"},"source":"corsa"}, []);
+
+init();
+
+var connection = CorsamHelpers->getConnection(data.mongo);  
+
+var objects = Mongo.find(data.collection, data.query, {}, {}, data.mongoOptions, connection);
+
+foreach(counter, object in objects){
+
+    if(counter % 1000 == 0)
+    {
+        Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed objects(s): " :: counter}, data.output);
+    }
+    
+    object.index = data.index;
+    object.sourceValue = data.source;
+    if(object.source.current.documents && object.source.current.documents.count){
+        object.versionCount = object.source.current.documents.count;
+    }
+    else
+    {
+        object.versionCount = 1;
+    }
+    
+    object.reversedVersionOrder = 1;
+    object.isVersion = false;
+    object.idUnique = object.source.current.corsa.objectId :: "-" :: object.source.current.corsa.objectType;
+    object.id = object.source.current.corsa.objectId :: "-" :: object.source.current.corsa.objectType;
+    
+    // object = processBinaryPath(object);
+    
+    if(data.toUdm == true){
+        object = toUdm(object);
+    }
+
+    processDocuments(object);
+    
+    Concurrency.push(object, data.output);
+}
+
+//----FUNCTIONS------------------------------------------------------------------------------------------------------
+private function processDocuments(object){
+    var versionsSorted = {};
+    
+    if(object.source.current.documents){
+        foreach(doc in object.source.current.documents.documents)
+        {
+            versionsSorted[doc.version] = doc;
+        }
+    
+        versionsSorted = Collection.sort(versionsSorted, false, true, true);
+        var reversedVersionOrder = 1;
+        
+        var docObject = Collection.duplicate(object);
+        Collection.remove(docObject, "udm");
+        
+        var count = 0;
+        foreach(version in versionsSorted){
+            
+            docObject.idUnique ::= version.version;
+            docObject.source.current.versions = version;
+            docObject.source.current.parentHierarchy = object.udm.hierarchy;
+            docObject.contentType = "CorsaDocument";
+            docObject.reversedVersionOrder = reversedVersionOrder;
+            if(count != 0){
+                docObject.isVersion = true;
+            }
+            
+            // docObject = processBinaryPath(versionObject);
+            
+            if(data.toUdm == true){
+                docObject = toUdm(docObject);
+            }
+            Concurrency.push(docObject, data.output);
+            reversedVersionOrder++;
+            count++;
+        }
+    }
+}
+
+// private function processBinaryPath(object){
+//     if(object.original.file != null && data.hashing.enabled == true){
+//         var binaryPath = parseBinaryPath(object.original.opentext.ProviderData.iniValue :: object.original.opentext.ProviderData.providerInfo);
+//         object.binaryPath = binaryPath;
+        
+//         if(data.hashing.enabled == true && (object.isVersion == false || data.hashing.versions == true)){
+//             object.generateHash = true;
+//         }
+//     }
+    
+//     return object;
+// }
+
+// private function parseBinaryPath(path){
+//     foreach(parser in data.pathParsers)
+//     {
+//         if(parser.regex == null){
+//             return path;
+//         }
+//         else if(String.matches(path, parser.regex, 60)){
+//             return String.replace(path, parser.regex, parser.replacement, true, 0, 60);
+//         }
+//     }
+// }
+
+private function toUdm(object){
+    
+    var udm = parseDocument(object);
+    
+    object = CorsamHelpers->setFieldValue(object, CorsamHelpers ->prepareField({"udm":"%value%"}, udm)); 
+    
+    return object;
+}
+
+private function parseDocument(object){
+        
+    var formatted = {};
+    
+    formatted._id = object.idUnique;
+    formatted.id = object.id;
+    formatted.versionCount = object.versionCount;
+    formatted.reversedVersionOrder = object.reversedVersionOrder;
+    
+    var type = "Document";
+    var isFile = false;
+    var deletedFromSource = false;
+    
+    formatted.type = type;
+    formatted.subType = object.contentType;
+   
+    
+    formatted.source = object.sourceValue;
+    if(object.contentType == "CorsaDocument"){
+        formatted.name = pathToName(object.source.current.versions.uriOriginal);
+        if(object.source.current.versions.uriOriginalHash && object.source.current.versions.uriOriginalHash != null){
+            formatted.binaryHash = object.source.current.versions.uriOriginalHash;
+        }
+        
+        formatted.binaryExtension = object.source.current.versions.binaryExtension;
+		formatted.binaryByteSize = object.source.current.versions.binarySize;
+		formatted.binaryByteSizeAsNumber = object.source.current.versions.binarySize;
+		formatted.binaryPath = [];
+		if(object.source.current.versions.uriOriginalExists && object.source.current.versions.uriOriginalExists == true)
+        {
+            formatted.binaryPath[] = object.source.current.versions.uriOriginal;
+        }
+        if(object.source.current.versions.uriArchiveExists && object.source.current.versions.uriArchiveExists == true){
+            formatted.binaryPath[] = object.source.current.versions.uriArchive;
+        }
+		
+		if(object.source.current.versions.author){
+		    formatted.prinicipalAuthor = object.source.current.versions.author;
+		}
+        isFile = true;
+    }
+    if(object.source.current.contents && object.source.current.contents.subject){
+        formatted.name = object.source.current.contents.subject;
+    }
+    else if(object.source.current.contents && object.source.current.contents.description){
+        formatted.name = object.source.current.contents.description;
+    }
+    else if(object.source.current.case && object.source.current.case.procedureValue){
+        formatted.name = object.source.current.case.procedureValue;
+    }
+    else if(object.source.current.name && object.source.current.name.name){
+        formatted.name = object.source.current.name.name;
+    }
+    else if(object.source.current.organizationalInformation && object.source.current.organizationalInformation.organisationUnitName){
+        formatted.name = object.source.current.organizationalInformation.organisationUnitName;
+    }
+    else if(object.source.current.organizationalInformation && object.source.current.organizationalInformation.email){
+        formatted.name = object.source.current.organizationalInformation.email;
+    }
+    else if(object.source.current.description){
+        formatted.name = object.source.current.description;
+    }
+    else{
+        formatted.name = "";    
+    }
+    
+    formatted.name = saveString(formatted.name);
+    formatted.state = [];
+    
+    if(object.source.current.status && object.source.current.status.handled == 1)
+    {
+        formatted.state[] = "handled";
+    }
+    
+    if(object.source.current.status && object.source.current.status.destroyed == 1){
+        formatted.state[] = "destroyed";
+    }
+      
+    if(object.source.current.versions && object.source.current.versions.uriArchiveExists == true){
+          formatted.state[] = "archived";
+    }
+    
+    var parent = "";
+    if(object.source.current.parentHierarchy){
+        parent = object.source.current.parentHierarchy;
+    }
+    var hierarchy = parent :: "/" :: formatted.name;
+    formatted.hierarchy = hierarchy;
+    
+    formatted.parent = parent;
+    
+    if(object.source.current.created){
+        formatted.dateCreated = Date.format(object.source.current.created.date,"yyy-MM-dd'T'HH:mm:ssX");
+        formatted.dateModified = Date.format(object.source.current.modified.date,"yyy-MM-dd'T'HH:mm:ssX");
+    }
+    else if(object.source.current.dateCreated){
+        formatted.dateCreated = Date.format(object.source.current.dateCreated,"yyy-MM-dd'T'HH:mm:ssX");
+        formatted.dateModified = Date.format(object.source.current.dateModified,"yyy-MM-dd'T'HH:mm:ssX");
+    }
+    
+    if(object.source.current.created && object.source.current.created.by != null) {
+        formatted.principalCreated = object.source.current.created.by;
+    }
+    
+    if(object.source.current.modified && object.source.current.modified.by != null) {
+        formatted.principalModified = object.source.current.modified.by;
+    }
+    
+    if(object.source.current.modified){
+        formatted.dateAccessed = Date.format(object.source.current.modified.date,"yyy-MM-dd'T'HH:mm:ssX");
+    }
+    
+    if(object.source.current.process && object.source.current.process.dateLetter){
+        formatted.dateLetter = object.source.current.process.dateLetter;
+    }
+    
+    if(object.source.current.process && object.source.current.process.dateRegistered){
+        formatted.dateRegistered = object.source.current.process.dateRegistered;
+    }
+    
+    if(object.source.current.process && object.source.current.process.dateReceived){
+        formatted.dateReceived = object.source.current.process.dateReceived;
+    }
+    
+    if(object.source.current.process && object.source.current.process.dateSent){
+        formatted.dateSent = object.source.current.process.dateSent;
+    }
+    
+    if(object.source.current.status && object.source.current.openDate){
+        formatted.dateOpened = object.source.current.openDate;
+    }
+    
+    if(object.source.current.status && object.source.current.closeDate){
+        formatted.dateClosed = object.source.current.closeDate;
+    }
+    
+    if(object.source.current.case && object.source.current.case.startDate){
+        formatted.dateStarted = object.source.current.case.startDate;
+    }
+    
+    if(object.source.current.case && object.source.current.case.deadline){
+        formatted.dateDeadline = object.source.current.case.deadline;
+    }
+
+	formatted.isFile = isFile;
+	formatted.language = "undefined";    
+    formatted.isOriginalLanguage = true;
+    formatted.deletedFromSource = deletedFromSource;
+    
+    formatted.metadata = {};
+    
+    if(object.source.current.email && object.source.current.email.email){
+        formatted.metadata.email = object.source.current.email.email;
+        
+    }
+    else if(object.source.current.organizationalInformation && object.source.current.organizationalInformation.email){
+        formatted.metadata.email = object.source.current.organizationalInformation.email;
+    }
+    
+    if(object.source.current.genre && object.source.current.genre.genreDescription){
+        formatted.metadata.genre = object.source.current.genre.genreDescription;
+    }
+    
+    if(object.source.current.classification && object.source.current.classification.classificationDescription){
+        formatted.metadata.classification = object.source.current.classification.classificationDescription;
+    }
+    
+    if(object.source.current.confidentialities && object.source.current.confidentialities.confidentialities){
+        formatted.metadata.confidentialities = [];
+        foreach(conf in object.source.current.confidentialities.confidentialities){
+            formatted.metadata.confidentialities = conf.confidentialityDescription;
+        }
+    }
+    
+    if(object.source.current.organizationalInformation && object.source.current.organizationalInformation.organisationUnitName){
+        formatted.metadata.organisationUnit = object.source.current.organizationalInformation.organisationUnitName;
+    }
+    
+   
+    return formatted;
+        
+}
+
+function pathToName(path) {
+     path = String.replace(path, "(.*[/])(.*)", "$2");
+     path = String.replace(path, "(\\.[\\-0-9a-zA-Z]+)$", "");
+     return path;
+}
+
+private function saveString(string){
+    
+    string = String.replace(string, "\\r", "");
+    string = String.replace(string, "\\n", " ");
+    return string;
+}
+private function init(){
+    
+    if(data.collection == null){
+        data.collection = "documents";
+    }
+    
+    if(data.source == null){
+        data.source = "Corsa";
+    }
+    
+    if(data.toUdm == null){
+        data.toUdm = true;
+    }
+    
+    if(data.query == null){ 
+        data.query = {};
+    }
+    
+    if(data.mongoOptions == null){
+        data.mongoOptions = {}; 
+    }
+}

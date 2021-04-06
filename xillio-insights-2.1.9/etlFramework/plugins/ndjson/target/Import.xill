@@ -1,0 +1,90 @@
+// Description: writes jsonline files containing lines of json objects
+// Config usage:
+// {
+//      "path" : specifies the path of the directory to store the jsonline files
+//      "contentLimit" : limits the amount of objects a jsonline file contains
+//      (optional) "sourceField" : {"path":{"toValue":"%value%"}}, specifies the part of the object to write to the jsonline file
+// }
+
+use Concurrency, System, Stream, File, Collection, String, Date, Assert;
+
+include etlFramework.plugins.ndjson.Helper as NdjsonHelpers;
+
+argument data = Concurrency.testInput({}, []);
+
+var fileCounter = 0;
+var totalCounter = 0;
+
+var jsonFile;
+
+var contentCounter = 0;
+
+//This creates the first file so that it can be written to.
+jsonFile = File.openWrite(data.path :: "/" :: addZeroes(fileCounter,6) :: ".jsonline");
+
+var object = Concurrency.pop(data.input);
+
+while(object != null){
+    if(object.xillioType == "log"){
+        Concurrency.push(object, data.output);
+    }
+    else
+    {
+        execute(object, data, false);
+    }
+    
+    object = Concurrency.pop(data.input);
+}
+
+fileCounter++;
+            
+private function addZeroes(value, length){
+    while(String.length(value)< length){
+        value = "0" :: value;
+    }
+    
+    return value;
+}
+
+function execute(object, data, assert)
+{
+   do
+   {
+        if(data.sourceField != null){
+            object = {"path" : NdjsonHelpers->getFieldValue(object, data.sourceField)};
+        }
+        
+        //If there are X entities in a jsonFile a new file will be created.
+        if(contentCounter >= data.contentLimit){
+            fileCounter++;
+            
+            contentCounter = 0;
+            jsonFile = File.openWrite(data.path :: "/" :: addZeroes(fileCounter,6) :: ".jsonline");
+        }
+        
+        var json = object;
+        Stream.write(System.toJSON(json) :: "\n", jsonFile);
+                        
+        if(totalCounter % 10000 == 0) {
+            Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed object(s)/file(s): " :: totalCounter :: "/":: fileCounter}, data.output);
+        }
+        
+        contentCounter++;
+        totalCounter++;
+
+   }
+   fail(e)
+   {
+       
+       
+       // Checks the assert value for true or false. When extending the functionality of the function, set to true so you can implement your own error handeling.
+       if(assert){
+           Assert.error(e.message);
+       }
+       else
+       {
+           Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+       }
+   }
+   
+}

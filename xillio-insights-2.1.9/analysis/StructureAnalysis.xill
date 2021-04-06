@@ -1,0 +1,510 @@
+use Concurrency, System, Mongo, Collection, XURL, Math, Date, String;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+argument data = Concurrency.testInput({"elasticsearch":{
+      "host":"http://localhost:9200",
+      "username":"",
+      "password":"",
+      "authenticationEnabled":false
+   },"enabledAnalysisTypes":["structure","structureperyear","structureperextension","structurecontainername"],"repositories":["drupal"],"index":"insights_default*", "structureIndexPrefix":"insightsanalytics_structure"}, []);
+
+structure();
+structurePerExtension();
+structurePerYear();
+structureContainerName();
+
+private function structure(){
+    
+    if(Collection.contains(data.enabledAnalysisTypes, "structure") == true){
+        var sources =   [
+                            { "index": { "terms" : { "field": "_index" } } },
+                            { "source": { "terms" : { "field": "source" } } },
+                            { "hierarchy": { "terms" : { "field": "parent.tree"} } }
+                        ];
+        
+        // if(data.analysisEnabled == true){
+        //     sources =   [
+        //                     { "source": { "terms" : { "field": "source" } } },
+        //                     { data.seperator: { "terms" : { "field": "analyticsClassification." :: data.seperator, "missing_bucket":true} } },
+        //                     { "hierarchy": { "terms" : { "field": "parent.tree"} } }
+        //                 ];
+        // }
+        
+        var query = {
+             "size" : 0,
+                  "query": {
+                    "bool" : {
+                        "filter" : [
+                            {
+                                 "terms" : {
+                                   "source" : data.repositories
+                                 }
+                            },
+                            {
+                                "term" : {
+                                    "reversedVersionOrder" : 1
+                                }
+                            }
+                        ]
+                    }
+                  },
+                  "aggs": {
+                    "structure": {
+                      "composite": {
+                        "size": 1000, 
+                        "sources": sources
+                      },
+                      "aggs": {
+                        "types": {
+                          "terms": {
+                            "field": "type",
+                            "size": 2
+                          },
+                          "aggs": {
+                             "lastCreated" : {
+                                "max": {
+                                  "field": "dateCreated"
+                                }
+                              },
+                              "lastModified" : {
+                                "max": {
+                                  "field": "dateModified"
+                                }
+                              }
+                            }
+                        },
+                        "fileSize" : {
+                          "sum": {
+                            "field": "binaryByteSize"
+                          }
+                        }
+                      }
+                    }
+                  }
+                };
+                
+        
+        var processing = true;
+        
+        var counter = 0;
+        
+        while(processing){
+        
+            var containers = ElasticsearchHelpers->search(data.index, query, data.elasticsearch);
+            
+            foreach(container in containers.body.aggregations.structure.buckets){
+            
+                if(counter % 1000 == 0)
+                {
+                    Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed record(s) for structure analysis: " :: counter}, data.output);
+                }
+                
+                var analysisObject = {
+                    "type" : "structure",
+                    "source" : container.key.source,
+                    "hierarchy" : container.key.hierarchy,
+                    "size": container.fileSize.value,
+                    "documentCount" : getDocCount(container),
+                    "containerCount" : getContainerCount(container),
+                    "dateLastCreated" : container.types.buckets[0].lastCreated.value_as_string,
+                    "dateLastModified" : container.types.buckets[0].lastModified.value_as_string,
+                    "indexMapping" : String.replace(container.key.index, String.replace(data.index,"\\*",""), data.structureIndexPrefix)
+                };
+                
+                // if(data.analysisEnabled == true){
+                //     analysisObject["analyticsClassification." :: data.seperator] = container.key[data.seperator];
+                // }
+                
+                Concurrency.push(analysisObject, data.output);
+                counter++;
+            }
+            
+            if(containers.body.aggregations.structure.after_key != null){
+                query.aggs.structure.composite.after = containers.body.aggregations.structure.after_key;
+            }
+            else{
+                processing = false;
+            }
+        }   
+    }
+}
+
+private function getDocCount(container){
+    var docCount;
+                    
+    if(Collection.length(container.types.buckets) > 0){
+        docCount = container.types.buckets[0].doc_count;
+    }
+    else
+    {
+        docCount = 0;
+    }
+    
+    return docCount;
+}
+
+private function getContainerCount(container){
+    var containerCount;
+                    
+    if(Collection.length(container.types.buckets) > 1){
+        containerCount = container.types.buckets[1].doc_count;
+    }
+    else
+    {
+        containerCount = 0;
+    }
+    
+    return containerCount;
+}
+
+private function structurePerYear(){
+
+    if(Collection.contains(data.enabledAnalysisTypes, "structureperyear") == true)
+    {
+        var sourcesModified =   [
+                            { "index": { "terms" : { "field": "_index" } } },
+                            { "source": { "terms" : { "field": "source" } } },
+                            { "hierarchy": { "terms" : { "field": "parent.tree"} } },
+                            { "year": { "date_histogram" : { "field": "dateModified", "interval":"year"} } }
+                        ];
+                        
+         var sourcesAccessed =   [
+                            { "index": { "terms" : { "field": "_index" } } },
+                            { "source": { "terms" : { "field": "source" } } },
+                            { "hierarchy": { "terms" : { "field": "parent.tree"} } },
+                            { "year": { "date_histogram" : { "field": "dateAccessed", "interval":"year"} } }
+                        ];
+        
+        // if(data.analysisEnabled == true){
+        //     sourcesModified =   [
+        //                     { "source": { "terms" : { "field": "source" } } },
+        //                     { data.seperator: { "terms" : { "field": "analyticsClassification." :: data.seperator, "missing_bucket":true} } },
+        //                     { "hierarchy": { "terms" : { "field": "parent.tree"} } },
+        //                     { "year": { "date_histogram" : { "field": "dateModified", "interval":"year"} } }
+        //                 ];
+                        
+        //     var sourcesAccessed =   [
+        //                     { "source": { "terms" : { "field": "source" } } },
+        //                     { data.seperator: { "terms" : { "field": "analyticsClassification." :: data.seperator, "missing_bucket":true} } },
+        //                     { "hierarchy": { "terms" : { "field": "parent.tree"} } },
+        //                     { "year": { "date_histogram" : { "field": "dateAccessed", "interval":"year"} } }
+        //                 ];            
+        // }
+    
+        var query = {
+        "size" : 0,
+        "query" : {
+            "bool" : {
+                "filter" : [
+                    {
+                         "terms" : {
+                           "source" : data.repositories
+                         }
+                    },
+                    {
+                        "term" : {
+                            "reversedVersionOrder" : 1
+                        }
+                    }
+                ]
+            }
+        },
+        "aggs" : {
+            "structureLastModified": {
+            "composite" : {
+                "size" : 1000,
+                "sources": sourcesModified
+            },
+            "aggs": {
+                "types": {
+                  "terms": {
+                    "field": "type",
+                    "size": 2
+                  }
+                }
+              }
+            },
+            "structureLastAccessed": {
+                "composite" : {
+                	"size" : 1000,
+                    "sources": sourcesAccessed
+                },
+                "aggs": {
+                    "types": {
+                      "terms": {
+                        "field": "type",
+                        "size": 2
+                      }
+                    }
+                }
+            }
+        }
+      };
+    
+        var processing = true;
+        
+        var counter = 0;
+        
+        while(processing){
+        
+            var containers = ElasticsearchHelpers->search(data.index, query, data.elasticsearch);
+            
+            if(containers.body.aggregations.structureLastModified != null){
+            foreach(container in containers.body.aggregations.structureLastModified.buckets){
+            
+                if(counter % 1000 == 0)
+                {
+                    Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed record(s) for structure per year analysis: " :: counter}, data.output);
+                }
+                 var analysisObject = {
+                    "type" : "structurePerYearModified",
+                    "hierarchy" : container.key.hierarchy,
+                    "source" : container.key.source,
+                    "dateYear": container.key.year,
+                    "documentCount" : getDocCount(container),
+                    "indexMapping" : String.replace(container.key.index, String.replace(data.index,"\\*",""), data.structureIndexPrefix)
+                };
+                
+                // if(data.analysisEnabled == true){
+                //     analysisObject["analyticsClassification." :: data.seperator] = container.key[data.seperator];
+                // }
+                
+                Concurrency.push(analysisObject, data.output);
+                counter++;
+            }
+            }
+            
+            if(containers.body.aggregations.structureLastAccessed != null){
+             foreach(container in containers.body.aggregations.structureLastAccessed.buckets){
+            
+                if(counter % 1000 == 0)
+                {
+                    Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed record(s) for structure per year anlysis: " :: counter}, data.output);
+                }
+                 var analysisObject = {
+                    "type" : "structurePerYearAccessed",
+                    "source" : container.key.source,
+                    "hierarchy" : container.key.hierarchy,
+                    "dateYear": container.key.year,
+                    "documentCount" : getDocCount(container),
+                    "indexMapping" : String.replace(container.key.index, String.replace(data.index,"\\*",""), data.structureIndexPrefix)
+                };
+                
+                // if(data.analysisEnabled == true){
+                //     analysisObject["analyticsClassification." :: data.seperator] = container.key[data.seperator];
+                // }
+                
+                Concurrency.push(analysisObject, data.output);
+                counter++;
+            }
+            }
+            
+            if(containers.body.aggregations.structureLastModified != null && containers.body.aggregations.structureLastModified.after_key != null){
+                query.aggs.structureLastModified.composite.after = containers.body.aggregations.structureLastModified.after_key;
+            }
+            else
+            {
+                Collection.remove(query.aggs, "structureLastModified");    
+            }
+            
+            if(containers.body.aggregations.structureLastAccessed != null && containers.body.aggregations.structureLastAccessed.after_key != null){
+                query.aggs.structureLastAccessed.composite.after = containers.body.aggregations.structureLastAccessed.after_key;
+            }
+            else
+            {
+                Collection.remove(query.aggs, "structureLastAccessed");    
+            }
+            
+            // if(containers.body.aggregations.structureLastModified == null && containers.body.aggregations.structureLastAccessed == null)
+            if(query.aggs.structureLastModified == null && query.aggs.structureLastAccessed == null)
+            {
+                processing = false;
+            }
+        }
+    }
+
+}
+
+private function structurePerExtension(){
+
+    if(Collection.contains(data.enabledAnalysisTypes, "structureperextension") == true){
+        var sources =   [
+                            { "index": { "terms" : { "field": "_index" } } },
+                            { "source": { "terms" : { "field": "source" } } },
+                            { "hierarchy": { "terms" : { "field": "parent.tree"} } },
+                            { "extension": { "terms" : { "field": "binaryExtension.normal", "missing_bucket":true} } }
+                        ];
+        
+        // if(data.analysisEnabled == true){
+        //     sources =   [
+        //                     { "source": { "terms" : { "field": "source" } } },
+        //                     { data.seperator: { "terms" : { "field": "analyticsClassification." :: data.seperator, "missing_bucket":true} } },
+        //                     { "hierarchy": { "terms" : { "field": "parent.tree"} } },
+        //                     { "extension": { "terms" : { "field": "binaryExtension.normal", "missing_bucket":true} } }
+        //                 ];
+        // }
+    
+        var query = {
+        "size" : 0,
+        "query" : {
+            "bool" : {
+                "filter" : [
+                    {
+                         "terms" : {
+                           "source" : data.repositories
+                         }
+                    },
+                    {
+                        "term" : {
+                            "reversedVersionOrder" : 1
+                        }
+                    }
+                ]
+            }
+        },
+        "aggs" : {
+            "structure": {
+                "composite" : {
+                	"size" : 1000,
+                    "sources": sources
+                }
+            }    
+        }
+      };
+    
+        var processing = true;
+        
+        var counter = 0;
+        
+        while(processing){
+        
+            var containers = ElasticsearchHelpers->search(data.index, query, data.elasticsearch);
+            
+            foreach(container in containers.body.aggregations.structure.buckets){
+            
+                if(counter % 1000 == 0)
+                {
+                    Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed record(s) for structure per extension analysis: " :: counter}, data.output);
+                }
+                 var analysisObject = {
+                    "type" : "structurePerExtension",
+                    "source" : container.key.source,
+                    "hierarchy" : container.key.hierarchy,
+                    "extension": container.key.extension,
+                    "documentCount" : container.doc_count,
+                    "indexMapping" : String.replace(container.key.index, String.replace(data.index,"\\*",""), data.structureIndexPrefix)
+                };
+                
+                // if(data.analysisEnabled == true){
+                //     analysisObject["analyticsClassification." :: data.seperator] = container.key[data.seperator];
+                // }
+                
+                Concurrency.push(analysisObject, data.output);
+                counter++;
+            }
+            
+            if(containers.body.aggregations.structure.after_key != null){
+                query.aggs.structure.composite.after = containers.body.aggregations.structure.after_key;
+            }
+            else{
+                processing = false;
+            }
+        }   
+    }
+
+}
+
+private function structureContainerName(){
+    
+    if(Collection.contains(data.enabledAnalysisTypes, "structurecontainername") == true){
+        var sources =   [
+                            { "index": { "terms" : { "field": "_index" } } },
+                            { "source": { "terms" : { "field": "source" } } },
+                            { "hierarchy": { "terms" : { "field": "parent.tree"} } },
+                            { "name": { "terms" : { "field": "name.keyword"} } }
+                        ];
+        
+        // if(data.analysisEnabled == true){
+        //     sources =   [
+        //                     { "source": { "terms" : { "field": "source" } } },
+        //                     { data.seperator: { "terms" : { "field": "analyticsClassification." :: data.seperator, "missing_bucket":true} } },
+        //                     { "hierarchy": { "terms" : { "field": "parent.tree"} } },
+        //                     { "name": { "terms" : { "field": "name.keyword"} } }
+        //                 ];
+        // }
+        
+        var query = {
+        "size" : 0,
+        "query" : {
+            "bool" : {
+                "filter" : [
+                    {
+                         "terms" : {
+                           "source" : data.repositories
+                         }
+                    },
+                    {
+                        "term" : {
+                            "type" : "Container"
+                        }
+                    },
+                    {
+                        "term" : {
+                            "reversedVersionOrder" : 1
+                        }
+                    }
+                ]
+            }
+        },
+        "aggs" : {
+            "structure": {
+                "composite" : {
+                	"size" : 1000,
+                    "sources": sources
+                }
+            }    
+        }
+        };
+    
+        var processing = true;
+        
+        var counter = 0;
+        
+        while(processing){
+        
+            var containers = ElasticsearchHelpers->search(data.index, query, data.elasticsearch);
+            
+            foreach(container in containers.body.aggregations.structure.buckets){
+            
+                if(counter % 1000 == 0)
+                {
+                    Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed record(s) for structure container name analysis: " :: counter}, data.output);
+                }
+                 var analysisObject = {
+                    "type" : "structurePerContainerName",
+                    "source" : container.key.source,
+                    "hierarchy" : container.key.hierarchy,
+                    "name": container.key.name,
+                    "documentCount" : container.doc_count,
+                    "indexMapping" : String.replace(container.key.index, String.replace(data.index,"\\*",""), data.structureIndexPrefix)
+                };
+                
+                // if(data.analysisEnabled == true){
+                //     analysisObject["analyticsClassification." :: data.seperator] = container.key[data.seperator];
+                // }
+                
+                Concurrency.push(analysisObject, data.output);
+                counter++;
+            }
+            
+            if(containers.body.aggregations.structure.after_key != null){
+                query.aggs.structure.composite.after = containers.body.aggregations.structure.after_key;
+            }
+            else{
+                processing = false;
+            }
+        }
+    }
+
+}

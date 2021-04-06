@@ -1,0 +1,81 @@
+use Concurrency, System, Mongo, Collection, XURL, Date, String;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+argument data = Concurrency.testInput({"elasticsearch":{
+      "host":"http://localhost:9200",
+      "username":"elastic",
+      "password":"elastic",
+      "authenticationEnabled":true
+   }, "repositories" : ["drupal"], "index" : "insights_default*", "linkIndexPrefix" : "insightsanalytics_links"}, []);
+
+var query = {
+    "size" : 100,
+    "query" : {
+        "bool" : {
+            "filter": [
+                {
+                    "terms" : {
+                       "source" : data.repositories
+                     }
+                },
+                {
+                  "exists" : {
+                    "field" : "url"
+                  }
+                }
+            ]
+        }    
+    }
+};
+
+var processing = true;
+
+var counter = 0;
+
+var documents = ElasticsearchHelpers->search(data.index, query, true, "30m", data.elasticsearch);
+
+while(processing){
+    
+    if(Collection.length(documents.body.hits.hits) == 0){
+        processing = false;
+    }
+        
+    foreach(hit in documents.body.hits.hits){
+        
+        if(counter % 1 == 0)
+        {
+            Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed object(s): " :: counter}, data.output);
+        }
+    
+        var linkResult = XURL.post("http://localhost:3000/check", {"url" : hit._source.url, "recursive" : false}, {});
+        
+        
+        foreach(link in linkResult.body.links){
+            var resultObject = {
+              "pageUrl"     : link.pageUrl,
+              "linkText"    : link.linkText,
+              "linkUrl"     : link.linkUrl,
+              "type"        : link.linkType,
+              "direction"   : link.linkDirection,
+              "statusCode"  : link.statusCode,
+              "message"     : link.message,
+              "status"      : link.statusCode :: " " :: link.message,
+              "redirect"    : link.redirect,
+              "indexMapping" : String.replace(hit._index, String.replace(data.index,"\\*",""), data.linkIndexPrefix)
+            };
+            
+            if(resultObject.redirect == true){
+                resultObject.redirectUrl = link.redirectUrl;
+            }
+            
+            Concurrency.push(resultObject, data.output);
+        }
+            
+        counter++;
+    }
+        
+    documents = ElasticsearchHelpers->scroll(documents.body._scroll_id, "30m", data.elasticsearch);
+}
+
+ElasticsearchHelpers->deleteScroll(documents.body._scroll_id, data.elasticsearch);

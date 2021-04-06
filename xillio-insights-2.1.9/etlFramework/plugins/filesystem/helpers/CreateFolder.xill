@@ -1,0 +1,11 @@
+use System, File, Collection, String;
+
+function createFolder(path){
+    path = normalizePath(path);
+    
+    File.createFolder(path);
+}
+
+private function normalizePath(path){
+    return String.replace(path,"\\","/", false, true, 0);
+}

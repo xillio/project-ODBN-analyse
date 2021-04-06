@@ -1,0 +1,18 @@
+use XURL, Assert, String, System;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+function bulk(body, index, elasticsearch){
+    
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+
+    var result = XURL.post(elasticsearch.host :: "/_bulk", body, options);
+
+    if(result.body.errors == true || String.startsWith(result.status.code, "2") != true){
+        Assert.error("Elasticsearch error! " :: result.body);
+    }
+    else
+    {
+        return result;
+    }
+}

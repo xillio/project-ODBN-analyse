@@ -1,0 +1,178 @@
+// Description on how to use. The ETL function should contain a description on how it should be used.
+// {
+//   "__name_of_repository": {
+//     "type": "livelink",
+//     "config": {
+//       "database": "__name_of_mongo_database__",
+//       "collection": "__name_of_mongo_database__",
+//       "folder": "__location_of_binaries__"
+//     }
+//   }
+// }
+
+use Concurrency, System, Mongo, Collection, XURL, Assert, Date, String, Hash, Stream, File;
+
+include etlFramework.plugins.livelink.Helper as livelinkHelpers;
+
+argument data = Concurrency.testInput({"database": "livelink_demo",
+      "collection": "documents"}, []);
+
+
+var database = Mongo.connect(data.database);
+var counter = 0;
+
+init();
+
+execute();
+
+// The execute function must contain the main processing logic.
+// For a source function this means at least getting the object from the source system and pushing it to the next queue. A source function doesn't contain a starting queue.
+// A source function must have a `source` property in the config that is added to the object extracted from the source system.
+// This property must be filled with a name specifying the source system.
+// For a transformation function you can basicly do anything with the object as long as it get the objects from a previous queue and pushes it to the next queue, use the boilerplate function below.
+// A target function doesn't push anything to the next queue but only executes a action on a (target) system, use the boilerplate function below.
+
+function execute()
+{  
+    var objects = Mongo.find(data.collection);
+    foreach (object in objects) {
+   do
+   {
+        // Write the function code here and push the the resulting object to the next queue (except for target functions)
+                
+        object.index = data.index;
+        // object.source = data.source;
+                
+        if(data.toUdm == true){
+            object = toUdm(object);
+        }
+        Concurrency.push(object, data.output);
+        
+   }
+   fail(e)
+   {
+       
+       
+       // Checks the assert value for true or false. When extending the functionality of the function, set to true so you can implement your own error handeling.
+       if(data.assert){
+           Assert.error(e.message);
+       }
+       else
+       {
+           Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+       }
+   }
+   
+   if(counter % 1000 == 0)
+    {
+        Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed objects(s): " :: counter}, data.output);
+    }
+    
+    counter++;
+   }
+   
+}
+
+private function toUdm(object){
+    
+    var udm = parseDocument(object);
+    object = livelinkHelpers->setFieldValue(object, livelinkHelpers->prepareField({"udm":"%value%"}, udm)); 
+    return object;
+}
+
+private function parseDocument(object){
+
+    var obj = object.target.current;
+    
+    var formatted = {};
+    
+    formatted._id = object._id;
+    formatted.reversedVersionOrder = 1;
+    
+    
+    if(object.contentType == "Container")
+    {
+        formatted.type = "Container";
+        formatted.subType = "Folder";
+        formatted.isFile = false;
+        formatted.name = obj.folder.name;
+        formatted.parent = obj.parent.path;
+        formatted.hierarchy = obj.parent.path::"/"::obj.folder.name;
+    } else {
+        formatted.type = "Document";
+        formatted.subType = "File";
+	    formatted.isFile = true;
+	    formatted.name = obj.document.title;
+	    formatted.parent = obj.parent.path;
+        formatted.hierarchy = obj.parent.path::"/"::obj.document.title;
+        formatted.dateAccessed = obj.accessed.date;
+        if (Collection.length(object.target.versions)>0) {
+        formatted.versionCount = Collection.length(object.target.versions)+1;
+        } else {
+            formatted.versionCount = 1;
+        }
+        formatted.binaryExtension = obj.file.rawExtension;
+        formatted.binaryByteSize = obj.file.size;
+        formatted.binaryByteSizeAsNumber = obj.file.size;
+        if (obj.file.MD5) {
+           formatted.binaryHash = obj.file.MD5;
+        }
+    }
+    
+    formatted.source = "LiveLink";
+    formatted.state = [];
+    
+    
+    
+    formatted.dateCreated = obj.created.date;
+    formatted.dateModified = obj.modified.date;
+    
+    // formatted.metadata = obj;
+    
+    return formatted;
+        
+}
+
+private function parseError(object){
+    var parsedError = {
+        "timestamp" : Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"),
+        "xillioType" : "log",
+        "xillioSubtype" : "error",
+        "xillioMessage" : object.auditLog[0].exception.type,
+        "xillioObject" : object.path
+    };
+    
+    return parsedError;
+}
+
+private function normalizePath(path){
+    return String.replace(path,"\\","/", false, true, 0);
+}
+
+function pathToName(path) {
+     path = String.replace(path, "(.*[/])(.*)", "$2");
+     path = String.replace(path, "(\\.[\\-0-9a-zA-Z]+)$", "");
+     return path;
+}
+
+function pathToExtension(path) {
+     var ext = String.replace(path, "(.*)([/])(.*\\.)([/-0-9a-zA-Z]+)$", "$4");
+     // required because Xill returns the entire string if no match is found!
+     if (String.length(ext) == String.length(path)) {
+          ext = null;
+     }
+     return (ext);
+}
+
+private function init(){
+    
+    // if(data.source == null){
+    //     data.source = "OpenTextContentServer";
+    // }
+    // if(data.index == null){
+    //     data.index = "OpenTextContentServer";
+    // }
+    if(data.toUdm == null){
+        data.toUdm = true;
+    }
+}

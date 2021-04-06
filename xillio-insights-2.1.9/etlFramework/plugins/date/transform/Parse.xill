@@ -1,0 +1,35 @@
+// Description: parses strings to dates in objects
+// Config usage:
+// {
+//      "dateFields" : {
+//         "object.path.to.field.to.parse" : "dateformat"  
+//      }
+// }
+
+use Concurrency, File, Stream, Hash, System, String, Date, Collection;
+
+include etlFramework.plugins.date.Helper as DateHelpers;
+
+argument data = Concurrency.testInput({},[]);
+
+var object = Concurrency.pop(data.input);
+
+while(object != null){
+    if(object.xillioType == "log"){
+        Concurrency.push(object, data.output);
+    }
+    else
+    {   
+        do {
+            
+            object = DateHelpers->parseDates(object, "", data.dateFields);
+            
+            Concurrency.push(object, data.output);
+        }
+        fail(e){
+            Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+        }
+    }
+    
+    object = Concurrency.pop(data.input);
+}

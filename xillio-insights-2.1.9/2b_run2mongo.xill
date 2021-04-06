@@ -1,0 +1,60 @@
+use System, Concurrency, Date, File, Collection, String, Stream;
+
+include etlFramework.Settings as Settings;
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+include Commons as Commons;
+
+argument std;
+var stdString;
+if(std != null){
+    var stdString = Stream.readLine(std.input);
+}
+
+var settings = Settings->getSettings(stdString);
+
+foreach(name, repositorySettings in settings.repositories){
+    
+    repositorySettings = Commons->initRepository(repositorySettings, name);
+    
+    if(repositorySettings.enabled == true){
+    
+        System.print("Start running connector: " :: repositorySettings.type :: " for " :: name, "INFO");
+        
+
+        var pipeline = [];
+        
+        pipeline[] = {
+            "robot" : repositorySettings.location :: repositorySettings.type :: "/source/ExtractSafeUDM.xill",
+           "config" : repositorySettings.config,
+            "threadCount" : 1 // do not change
+        };
+
+        pipeline[] = {
+            "robot" : "etlFramework/plugins/mongo/target/InsertOne.xill",
+            "config" : {
+                "mongo" :  {
+                  "host" : settings.general.mongo.host,
+                  "name" : settings.general.mongo.name,
+                  "username" : null,
+                  "password" : null,
+                  "port":settings.general.mongo.port
+                },
+                "collection":settings.general.mongo.collection
+            },
+            "threadCount" : settings.system.importConfig.threadCount
+        };
+        
+        
+        pipeline[] =  {
+            "robot" : "etlFramework/plugins/console/target/Log.xill",
+            "config" : {},
+            "threadCount" : 1, // do not change
+        };
+        
+        Concurrency.run(pipeline);
+        
+        System.wait(31000);
+
+        System.print("Finished running connector: " :: repositorySettings.type :: " for " :: name, "INFO");
+    }
+}

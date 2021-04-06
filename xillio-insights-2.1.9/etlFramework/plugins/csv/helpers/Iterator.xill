@@ -1,0 +1,59 @@
+use Stream, File, Assert, System, String, Collection;
+
+
+
+
+// Iterate through CSV file using a while loop, more efficient than creating a large list or object
+function iterate(csvStream, getHeading, heading, delimiter, hasEnclosure) {
+     
+    // Result Object that is returned containing the values of the CSV line
+    var object = {};
+    var line;
+     
+    // Line from the CSV stream
+    do {
+        line = Stream.readLine(csvStream);
+    }
+    // End of the stream has been reached return null to stop iteration
+    if( !line ) { return null; }
+     
+    // Values from the line seperated by the seperator character
+    var columns = String.split(line, delimiter, true);
+     
+    foreach(columnIndex, column in columns) {
+         
+        // Remove ? enclosure tags
+        if(hasEnclosure){
+            column = String.replace(column, "^\"", "", true, false, 0);
+            column = String.replace(column, "\"$", "", true, false, 0);
+        }
+             
+        // This is heading
+        if(getHeading) {
+             
+            // Based on the first line we create a list containing the keys for the CSV objects
+            heading[] = cleanKey(column);
+             
+        } else {
+             
+            // Adding values to the result Object
+            object[heading[columnIndex]] = column;
+             
+        }
+    }
+
+    if(getHeading){
+        return heading;
+    }
+    else
+    {
+        return object;
+    }
+}
+ 
+private function cleanKey(key) {
+    key = String.toLower(key);
+    key = String.replace(key, "[^a-zA-Z-0-9]", "");
+     
+    return key;
+}

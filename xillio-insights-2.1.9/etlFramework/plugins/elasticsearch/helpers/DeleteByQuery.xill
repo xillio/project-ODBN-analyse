@@ -1,0 +1,24 @@
+use XURL, Assert, String;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+function deleteByQuery(query, index, urlParams, elasticsearch){
+    
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+    
+    var body = {
+        "query" : query,
+    };
+    
+    var url = elasticsearch.host :: "/" :: index :: "/_delete_by_query" :: urlParams;
+    
+    var result = XURL.post(url , body, options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        Assert.error("Elasticsearch error! " :: result.body.error);
+    }
+    else
+    {
+        return result;
+    }
+}

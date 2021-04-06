@@ -1,0 +1,28 @@
+use XURL, String, Assert;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+
+function search(indexName, query, elasticsearch){
+    return search(indexName, query, false, "1m", elasticsearch);
+}
+
+function search(indexName, query, scroll, keepAlive, elasticsearch){
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+    
+    var url = elasticsearch.host :: "/" :: indexName :: "/_search";
+    
+    if(scroll == true){
+        url ::= "?scroll=" :: keepAlive;
+    }
+    
+    var result = XURL.post(url, query, options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        Assert.error("Elasticsearch error! " :: result.body.error);
+    }
+    else
+    {
+        return result;
+    }
+}

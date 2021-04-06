@@ -1,0 +1,13 @@
+include etlFramework.plugins.mongo.helpers.Connection;
+include etlFramework.plugins.mongo.helpers.Drop;
+include etlFramework.plugins.mongo.helpers.Index;
+include etlFramework.plugins.mongo.helpers.InsertOne;
+include etlFramework.plugins.mongo.helpers.ReplaceOne;
+include etlFramework.plugins.mongo.helpers.UpdateOne;
+include etlFramework.plugins.mongo.helpers.Update;
+include etlFramework.plugins.mongo.helpers.ObjectManagement;
+include etlFramework.plugins.mongo.helpers.Find;
+include etlFramework.plugins.mongo.helpers.FindOne;
+include etlFramework.plugins.mongo.helpers.Remove;
+include etlFramework.plugins.mongo.helpers.Aggregate;
+include etlFramework.plugins.mongo.helpers.Count;

@@ -1,0 +1,57 @@
+use XURL, String;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+function createDataframe(id, configuration, elasticsearch){
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+    var createdDataframe = XURL.put(elasticsearch.host :: "/_data_frame/transforms/" :: id, configuration, options);
+    
+    if(String.startsWith(createdDataframe.status.code, "2") != true){
+        Assert.error("Elasticsearch error! " :: createdDataframe.body.error);
+    }
+    else
+    {
+        return createdDataframe;
+    }
+    
+}
+
+
+function startDataframe(id, elasticsearch){
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);    
+    var startedDataframe = XURL.post(elasticsearch.host ::"/_data_frame/transforms/" :: id ::"/_start", {}, options);
+    
+    if(String.startsWith(startedDataframe.status.code, "2") != true){
+        Assert.error("Elasticsearch error! " :: startedDataframe.body.error);
+    }
+    else
+    {
+        return startedDataframe;
+    }
+
+}
+
+function deleteDataframe(id, elasticsearch){
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+    var deletedDataframe = XURL.delete(elasticsearch.host :: "/_data_frame/transforms/" :: id, options);
+    
+    if(String.startsWith(deletedDataframe.status.code, "2") != true){
+        Assert.error("Elasticsearch error! " :: deletedDataframe.body.error);
+    }
+    else
+    {
+        return deletedDataframe;
+    }
+}
+
+function dataframeExists(id, elasticsearch){
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+    var dataframeExists = XURL.get(elasticsearch.host :: "/_data_frame/transforms/" :: id, options);
+    if(dataframeExists.status.code == 200)
+    {
+        return true;
+    }
+    else{
+        return false;
+    }
+}

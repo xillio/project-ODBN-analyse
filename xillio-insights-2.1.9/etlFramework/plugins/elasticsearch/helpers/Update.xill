@@ -1,0 +1,20 @@
+use XURL, Assert, String;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+function update(_id, update, index, elasticsearch){
+    
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+    
+    var body = update;
+    
+    var result = XURL.post(elasticsearch.host :: "/" :: index :: "/_update/" :: _id, body, options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        Assert.error("Elasticsearch error! " :: result.body.error);
+    }
+    else
+    {
+        return result;
+    }
+}

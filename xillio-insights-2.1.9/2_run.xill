@@ -1,0 +1,122 @@
+use System, Concurrency, Date, File, Collection, String, Stream;
+
+include etlFramework.Settings as Settings;
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+include Commons as Commons;
+
+argument std;
+var stdString;
+if(std != null){
+    var stdString = Stream.readLine(std.input);
+}
+
+var settings = Settings->getSettings(stdString);
+
+foreach(name, repositorySettings in settings.repositories){
+    
+    repositorySettings = Commons->initRepository(repositorySettings, name);
+    
+    if(repositorySettings.enabled == true){
+    
+        System.print("Start running connector: " :: repositorySettings.type :: " for " :: name, "INFO");
+        
+        preProcessDelete(repositorySettings.config.source);
+        
+        var pipeline = [];
+        
+        pipeline[] = {
+            "robot" : repositorySettings.location :: repositorySettings.type :: "/source/Extract.xill",
+            "config" : repositorySettings.config,
+            "threadCount" : 1 // do not change
+        };
+        
+        if(repositorySettings.customMapping != null){
+            pipeline[] = {
+                "robot" : repositorySettings.customMapping,
+                "threadCount": settings.system.threadCount,
+                "config" : repositorySettings.config
+            };
+        }
+        
+        pipeline[] = {
+            "robot" : "etlFramework/plugins/hash/transform/Hash.xill",
+            "config" : {
+                "tempPath" : settings.general.tempPath
+            },
+            "threadCount" : settings.system.threadCount
+        };
+       
+        pipeline[] = {
+            "robot" : "etlFramework/plugins/elasticsearch/target/Bulk.xill",
+            "config" : {
+                "elasticsearch" : settings.general.elasticsearch,
+                "bulkSize" : settings.system.importConfig.bulkSize,
+                "indexPrefix" : settings.system.importConfig.indexPrefix,
+                "indexMapping" : {
+                  "field" : settings.system.indexMapping.field,
+                  "type" : settings.system.indexMapping.type,
+                  "mappings" : settings.indexMapping
+                },
+                "action" : "update",
+                "upsert" : true,
+                "sourceField" : settings.system.importConfig.sourceField
+            },
+            "threadCount" : settings.system.importConfig.threadCount
+        };
+        
+        pipeline[] =  {
+            "robot" : "etlFramework/plugins/console/target/Log.xill",
+            "config" : {},
+            "threadCount" : 1, // do not change
+        };
+        
+        Concurrency.run(pipeline);
+        
+        System.wait(31000);
+        processDelete(repositorySettings.config.source);
+        
+        System.print("Finished running connector: " :: repositorySettings.type :: " for " :: name, "INFO");
+    }else{
+          System.print("Skipping connector: " :: repositorySettings.type :: " for " :: name, "INFO");
+    }
+}
+
+System.print("Finished run", "INFO");
+
+  
+//---FUNCTIONS---------------------------------------------------------------------------------------------------------------
+private function preProcessDelete(source){
+    var result = ElasticsearchHelpers->updateByQuery({
+        "bool": {
+          "filter": [
+              {
+                  "term" : {
+                      "source" : source
+                  }
+              }
+          ]
+        }
+    }, 
+    {
+        "source": "ctx._source.deletedFromSource = true",
+        "lang": "painless"
+    } , settings.system.defaultIndexPattern, "?wait_for_completion=false&refresh=true", settings.general.elasticsearch);
+    
+    Commons->waitForTask(result.body.task);
+}
+
+private function processDelete(source){
+    var result = ElasticsearchHelpers->deleteByQuery({
+    "bool": {
+        "filter": [
+            {
+                "term" : {
+                    "deletedFromSource" : true
+                }
+            }
+        ]
+      }
+    }, settings.system.defaultIndexPattern, "?wait_for_completion=false&refresh=true", settings.general.elasticsearch);
+    
+    Commons->waitForTask(result.body.task);
+}

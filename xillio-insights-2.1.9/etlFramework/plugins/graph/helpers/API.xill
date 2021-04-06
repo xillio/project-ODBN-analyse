@@ -1,0 +1,104 @@
+use XURL, Assert, String, System, Encode;
+
+function searchSites(query, connectionUrl ,token, attempts)
+{
+    var options = { "headers": { "Authorization": "Bearer " :: token }};
+    var result = XURL.get(connectionUrl :: "/sites" :: query , options);
+    
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        if (String.startsWith(result.status.code, "503") && attempts < 3) {
+            attempts++;
+            Assert.error('Service unavailable! Attempt: ':: attempts ::' Retrying in ' :: result.headers["Retry-After"] :: 'seconds');
+            System.wait(result.headers["Retry-After"] * 1000 + 1000);
+            searchSites(query, connectionUrl ,token, attempts);
+        }
+        Assert.error("Sharepoint error! " :: result.body.error.message);
+    }
+    else
+    {
+        return result.body;
+    }
+}
+
+function fetchNext(url, token, attempts){
+    var options = { "headers": { "Authorization": "Bearer " :: token }};
+    var result = XURL.get(url, options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        if (String.startsWith(result.status.code, "503") && attempts < 3) {
+            attempts++;
+            Assert.error('Service unavailable! Attempt: ':: attempts ::' Retrying in ' :: result.headers["Retry-After"] :: 'seconds');
+            System.wait(result.headers["Retry-After"] * 1000 + 1000);
+            fetchNext(url, token, attempts);
+        }
+        Assert.error("Sharepoint error! " :: result.body.error.message);
+    }
+    else
+    {
+        return result.body;
+    }
+}
+
+function getByType(type, connectionUrl, token, attempts){
+
+    var options = { "headers": { "Authorization": "Bearer " :: token }};
+    var result = XURL.get(connectionUrl :: "/" :: type ::"/", options);
+    
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        if (String.startsWith(result.status.code, "503") && attempts < 3) {
+            attempts++;
+            Assert.error('Service unavailable! Attempt: ':: attempts ::' Retrying in ' :: result.headers["Retry-After"] :: 'seconds');
+            System.wait(result.headers["Retry-After"] * 1000 + 1000);
+            getByType(type, connectionUrl, token, attempts);
+        }
+        Assert.error("Sharepoint error! " :: result.body.error.message);
+    }
+    else
+    {
+        return result.body;
+    }
+}
+
+function getDriveItemChildren(driveId, itemId, connectionUrl, token, attempts){
+    
+    var options = { "headers": { "Authorization": "Bearer " :: token }};
+    var result = XURL.get(connectionUrl :: "/drives/" :: driveId :: "/items/" :: itemId :: "/children/", options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        if (String.startsWith(result.status.code, "503") && attempts < 3) {
+            attempts++;
+            Assert.error('Service unavailable! Attempt: ':: attempts ::' Retrying in ' :: result.headers["Retry-After"] :: 'seconds');
+            System.wait(result.headers["Retry-After"] * 1000 + 1000);
+            getDriveItemChildren(driveId, itemId, connectionUrl, token, attempts);
+        }
+        Assert.error("Sharepoint error! " :: result.body.error.message);
+    }
+    else
+    {
+        return result.body;
+    }
+    
+}
+
+function getDriveItem(driveId, itemId, connectionUrl, token, attempts){
+    
+    var options = { "headers": { "Authorization": "Bearer " :: token }};
+    var result = XURL.get(connectionUrl :: "/drives/" :: driveId :: "/items/" :: itemId, options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        if (String.startsWith(result.status.code, "503") && attempts < 3) {
+            attempts++;
+            Assert.error('Service unavailable! Attempt: ':: attempts ::' Retrying in ' :: result.headers["Retry-After"] :: 'seconds');
+            System.wait(result.headers["Retry-After"] * 1000 + 1000);
+            getDriveItem(driveId, itemId, connectionUrl, token, attempts);
+        }
+        Assert.error("Sharepoint error! " :: result.body.error.message);
+    }
+    else
+    {
+        return result.body;
+    }
+    
+}

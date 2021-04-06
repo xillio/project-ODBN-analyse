@@ -1,0 +1,57 @@
+use XURL, String, Assert;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+function deleteIndex(index, elasticsearch){
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+    
+    if(indexExists(index, elasticsearch)){
+        var result = XURL.delete(elasticsearch.host :: "/" :: index, options);
+        
+        if(String.startsWith(result.status.code, "2") != true){
+            Assert.error("Elasticsearch error! " :: result.body.error);
+        }
+        else
+        {
+            return result;
+        }
+    }
+}
+
+function createIndex(index, configuration, elasticsearch){
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+    var result = XURL.put(elasticsearch.host :: "/" :: index, configuration, options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        Assert.error("Elasticsearch error! " :: result.body.error);
+    }
+    else
+    {
+        return result;
+    }
+}
+
+function indexExists(index, elasticsearch){
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+    var indexExists = XURL.get(elasticsearch.host :: "/" :: index, options);
+    if(indexExists.status.code == 200)
+    {
+        return true;
+    }
+    else{
+        return false;
+    }
+}
+
+function updateSettings(index, configuration, elasticsearch){
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+    var result = XURL.put(elasticsearch.host :: "/" :: index :: "/_settings", configuration, options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        Assert.error("Elasticsearch error! " :: result.body.error);
+    }
+    else
+    {
+        return result;
+    }
+}

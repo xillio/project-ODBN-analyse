@@ -1,0 +1,143 @@
+// Description: function to crawl to Drupal
+// Config usage:
+// {
+
+// }
+
+use XURL, System, File, Stream, Concurrency, Date, String, Collection;
+
+include etlFramework.plugins.drupal.Helper as DrupalHelpers;
+
+argument data = Concurrency.testInput({"host":"http://drupal-con.xillio.com", "username":"user", "password":"bitnami", "defaultLangCode"  : "en", "siteUrl" : "http://drupal-con.xillio.com"}, []);
+
+init();
+
+var counter = 0;
+
+var state = DrupalHelpers->getState(data.host, data.username, data.password);
+
+var pageId = 0;
+var nodes = DrupalHelpers->getNodes(state, pageId, "json");
+
+while(Collection.length(nodes) > 0){
+
+    foreach(node in nodes){
+        var parsedObject = toUdm(node);
+        push(parsedObject);
+    }
+    
+    pageId++;
+    nodes = DrupalHelpers->getNodes(state, pageId, "json");
+}
+
+
+var b;
+
+private function toUdm(object){
+    
+    object.index = data.index;
+    object.source = data.source;
+    
+    var udm = parseDocument(object);
+    
+    object = DrupalHelpers->setFieldValue(object, DrupalHelpers->prepareField({"udm":"%value%"}, udm)); 
+    
+    return object;
+}
+
+private function parseDocument(object){
+
+    var formatted = {};
+    
+    formatted._id = object.nid[0].value :: object.langcode[0].value;
+    formatted.id = object.nid[0].value;
+    formatted.reversedVersionOrder = 1;
+    formatted.versionCount = 1;
+    
+    formatted.isFile = false;
+    
+    formatted.type = "Document";
+    formatted.subType = object.type[0].target_id;
+    
+    formatted.source = data.source;
+    formatted.name = object.title[0].value;
+    
+    formatted.state = [];
+    
+    var principalAuthor = DrupalHelpers->getUser(state, "json", object.uid[0].target_id).name[0].value;
+    var principalModified = DrupalHelpers->getUser(state, "json", object.revision_uid[0].target_id).name[0].value;
+    
+    formatted.principalAuthor = principalAuthor;
+    formatted.principalModified = principalModified;
+
+    if(object.path[0].alias != null){
+        if(object.path[0].langcode == data.defaultLangCode){
+            formatted.hierarchy = object.path[0].alias;    
+        }
+        else
+        {
+            formatted.hierarchy = "/" :: object.path[0].langcode :: object.path[0].alias;
+        }
+    }
+    else{
+        if(object.path[0].langcode == data.defaultLangCode){
+            formatted.hierarchy = "/node/" :: object.nid[0].value;
+        }
+        else
+        {
+            formatted.hierarchy = "/" :: object.path[0].langcode :: "/node/" :: object.nid[0].value;
+        }
+    }
+    
+    formatted.url = data.siteUrl :: formatted.hierarchy;
+    formatted.parent = getParentFromHierarchy(formatted.hierarchy);
+    
+    formatted.dateCreated = object.created[0].value;
+    formatted.dateModified = object.changed[0].value;
+    
+    formatted.language = object.langcode[0].value;
+    formatted.isOriginalLanguage = object.default_langcode[0].value;
+    
+    
+    // if(object.file != null){
+    //     formatted.name = pathToName(object.name);
+    //     formatted.binaryExtension = pathToExtension("/" :: object.name);
+    //     formatted.binaryByteSize = object.size;
+    //     formatted.binaryByteSizeAsNumber = object.size;
+    //     if(data.hashing.enabled == false){
+    //         if(object.file.hashes != null && object.file.hashes.quickXorHash != null){
+    //             formatted.binaryHash = object.file.hashes.quickXorHash;
+    //         }
+    //     }
+    //     else
+    //     {
+    //         object.generateHash = true;
+    //         formatted.binaryPath = object["@microsoft.graph.downloadUrl"];
+    //     }
+    // }
+    
+    formatted.deletedFromSource = false;
+    
+    return formatted;
+        
+}
+
+private function getParentFromHierarchy(hierarchy){
+    return String.replace(hierarchy, "(.*)\\/.*", "$1", true);
+}
+
+private function push(object){
+    Concurrency.push(object, data.output);
+    
+    if(counter % 1000 == 0)
+    {
+        Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed objects(s): " :: counter}, data.output);
+    }
+    
+    counter++;
+    
+}
+
+private function init(){
+    
+}

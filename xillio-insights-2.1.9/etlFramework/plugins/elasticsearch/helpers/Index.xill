@@ -1,0 +1,24 @@
+use XURL, Assert, String, Collection;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+function index(object, _id, index, elasticsearch){
+    
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+    
+    var url = elasticsearch.host :: "/" :: index :: "/_doc";
+    
+    if(_id != null){
+        url ::= "/" :: _id;
+    }
+    
+    var result = XURL.post(url, object, options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        Assert.error("Elasticsearch error! " :: result.body.error);
+    }
+    else
+    {
+        return result;
+    }
+}

@@ -1,0 +1,8 @@
+use Mongo;
+
+include etlFramework.plugins.mongo.Helper as MongoHelpers;
+
+function insertOne(object, collection, mongo){
+    var connection = MongoHelpers->getConnection(mongo);
+    Mongo.insertOne(collection, object, connection);
+}

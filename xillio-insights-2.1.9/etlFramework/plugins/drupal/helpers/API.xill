@@ -1,0 +1,89 @@
+/**
+ * Connector: drupal8
+ * Author: Remco Steelink
+ * Date: 2017-07-13
+ *
+ * Node API using the Drupal8 REST API
+ */
+
+use Assert, System;
+
+include etlFramework.plugins.drupal.Helper as DrupalHelpers;
+
+// To make this function work you have to create a view with a rest export within Drupal.
+// To do this go to structure->views and create a new view.
+// In View Settings, select 'content of all'. Select 'Provide a REST export' and set the 'export path' to '/views/node' and click 'Save and edit'.
+// In the 'format settings' specify all the supported request formats.
+// In the 'path settings' set the authentication options (select both options).
+// Change the access to 'Role & Administrator'.
+// In the 'paging settings' select 'Paged output, full pager'.
+// Save all the settings. Note that you might change the above settings according to your needs.
+function getNodes(state, pageId, returnFormat){
+    var result = DrupalHelpers->GET(state, "/views/node?page=" :: pageId :: "&_format=" :: returnFormat);
+    
+    Assert.equal(result.status.code, 200, "Non 200 status-code returned!");
+
+     return result.body;
+}
+
+// fetches the node by id
+function getNode(state, language, returnFormat, id) {
+    // add language when provided
+    var languagePrefix = "";
+    if (language != null) {
+        languagePrefix = "/"::language;
+    }
+    
+    var result = DrupalHelpers->GET(state, languagePrefix::"/node/"::id::"?_format=" :: returnFormat);
+    
+    Assert.equal(result.status.code, 200, "Non 200 status-code returned: " :: result.body.message);
+    return result.body;
+}
+
+function getState(host, username, password) {
+    var state = {
+        "host" : host,
+        "user" : username,
+        "pass" : password
+    };
+    
+    state.token = getToken(state);
+    return state;
+}
+
+// fetches the user by id
+function getUser(state, returnFormat, id) {
+    // add language when provided
+    
+    var result = DrupalHelpers->GET(state, "/user/"::id::"?_format=" :: returnFormat);
+    
+    Assert.equal(result.status.code, 200, "Non 200 status-code returned: " :: result.body.message);
+    return result.body;
+}
+
+// fetch a token
+function getToken(state) {  
+
+    // logout first
+    do {
+        XURL.get(state.host::"/user/logout");
+    }    
+    
+    // form body
+    var body = {
+        "name" : state.user,
+        "pass" : state.pass
+    };
+    var options = {
+        "headers" : {
+            "Content-Type" : "application/x-www-form-urlencoded"
+        },
+    };
+
+    // login
+    var login = XURL.post(state.host::"/user/login?_format=json", System.toJSON(body), options);
+    Assert.equal(login.status.code, 200, "Non 200 status-code returned");
+    
+    // return token
+    return login.body.csrf_token;    
+}

@@ -1,0 +1,38 @@
+{
+  "modules": {
+    "getFiles": {
+      "type": "jsonlineReader",
+      "inputDir":"F:/data/pipe/extract/m-drive/files2",
+      "filePrefix": "files",
+      "outputTo": [
+        "hasher"
+      ]
+    },
+    "hasher": {
+      "type": "hasher",
+      "perCore": true,
+      "concurrency": 1,
+      "hashes": [
+        "MD5"
+      ],
+      "outputTo": [
+        "output"
+      ],
+      "errorsTo" : [
+        "errors" 
+      ]
+    },
+    "output": {
+      "type": "jsonlineWriter",
+       "preClean" : "false",
+      "filePrefix": "hashed2",
+      "outputDir" : "F:/data/pipe/hashed/m-drive/files" 
+    },
+    "errors": {
+      "type": "jsonlineWriter",
+      "filePrefix": "errors2",
+      "preClean" : "false",
+      "outputDir" : "F:/data/pipe/hashed/m-drive/errors" 
+    }
+  }
+}

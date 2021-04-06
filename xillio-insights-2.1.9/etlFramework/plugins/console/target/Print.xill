@@ -1,0 +1,49 @@
+// Description: prints the object to the console as INFO message
+// Config usage:
+// {
+//      (optional) "sourceField" : specifies the part of to object to display {"path":{"to":{"value":"%value%"}}}
+// }
+
+use Concurrency, System, Mongo, Collection, XURL, String, Assert, Date;
+
+include etlFramework.plugins.console.Helper as ConsoleHelpers;
+
+argument data = Concurrency.testInput({}, []);
+
+var object = Concurrency.pop(data.input);
+
+while(object != null){
+     if(object.xillioType == "log"){
+        Concurrency.push(object, data.output);
+    }
+    else
+    {
+        execute(object, data, false);
+    }
+    object = Concurrency.pop(data.input);
+}
+
+function execute(object, data, assert)
+{
+   do
+   {
+        if(data.sourceField != null){
+            object = ConsoleHelpers->getFieldValue(object, data.sourceField);
+        }
+        System.print(object, "INFO");
+   }
+   fail(e)
+   {
+       
+       
+       // Checks the assert value for true or false. When extending the functionality of the function, set to true so you can implement your own error handeling.
+       if(assert){
+           Assert.error(e.message);
+       }
+       else
+       {
+           Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+       }
+   }
+   
+}

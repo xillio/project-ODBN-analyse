@@ -1,0 +1,30 @@
+use XURL, Assert, String, Collection;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+function reIndex(source, dest, script, conflicts, urlParams, elasticsearch){
+    
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+    
+    var url = elasticsearch.host :: "/_reindex" :: urlParams;
+    
+    var body ={
+        "conflicts" : conflicts,
+        "source" : source,
+        "dest" : dest
+    };
+    
+    if(script != null && script != {}){
+        body["script"] = script;
+    }
+    
+    var result = XURL.post(url, body, options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        Assert.error("Elasticsearch error! " :: result.body.error);
+    }
+    else
+    {
+        return result;
+    }
+}

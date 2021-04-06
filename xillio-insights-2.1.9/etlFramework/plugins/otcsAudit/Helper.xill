@@ -1,0 +1,3 @@
+// This robot should include all plugin helper robots
+
+include etlFramework.plugins.templatePlugin.helpers.ObjectManagement;

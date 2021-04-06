@@ -1,0 +1,33 @@
+use XURL, Assert, String, System, Encode, Date;
+
+function repositories(host, token, timeout){
+    return entities(host :: "/v2/entities", "children", token, timeout);
+}
+
+function entities(id, scope, token, timeout){
+    return entities(id, scope, token, null, null, timeout);
+}
+
+function entities(id, scope, token, offset, limit, timeout)
+{
+    var options = { "headers": { "Authorization": "Bearer " :: token }, "timeout":timeout};
+    var url = id;
+    
+    if(scope != null && scope != ""){
+        url ::= "?scope=" :: scope;
+    }
+    
+    if(offset != null && limit != null){
+        url ::= "&offset=" :: offset :: "&limit=" :: limit; 
+    }
+    
+    var result = XURL.get(url, options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        Assert.error("Xillio API error! " :: result.body.message);
+    }
+    else
+    {
+        return result.body;
+    }
+}

@@ -1,0 +1,4 @@
+include etlFramework.plugins.kibana.helpers.Connection;
+include etlFramework.plugins.kibana.helpers.Object;
+include etlFramework.plugins.kibana.helpers.Space;
+include etlFramework.plugins.kibana.helpers.Role;

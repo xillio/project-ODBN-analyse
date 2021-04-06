@@ -1,0 +1,11 @@
+use Mongo;
+
+include etlFramework.plugins.mongo.Helper as MongoHelpers;
+
+function drop(collections, mongo)
+{
+    var connection = MongoHelpers->getConnection(mongo);
+    foreach(collection in collections){
+        Mongo.drop(collection, connection);
+    }
+}

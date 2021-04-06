@@ -1,0 +1,13 @@
+function getConnectionOptions(elasticsearch){
+    var options = {"headers":{"Content-Type" : "application/json"}};
+
+    if(elasticsearch.authenticationEnabled == true){
+        var basicAuth = {
+            "username" : elasticsearch.username,
+            "password" : elasticsearch.password
+        };
+        options += {"basicAuth" : basicAuth};
+    }
+    
+    return options;
+}

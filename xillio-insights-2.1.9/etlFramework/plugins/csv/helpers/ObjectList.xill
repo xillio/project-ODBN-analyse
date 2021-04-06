@@ -1,0 +1,13 @@
+function objectToList(object, type)
+{
+    var list = [];
+    foreach(key, value in object){
+        if(type == "key"){
+            list[] = key;
+        }
+        else if(type == "value"){
+            list[] = value;
+        }
+    }
+    return list;
+}

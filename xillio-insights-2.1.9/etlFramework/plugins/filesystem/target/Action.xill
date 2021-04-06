@@ -1,0 +1,70 @@
+// Description: executes an action on the filesystem for the given object
+// Config usage:
+// {
+//      "sourcePathField" : {"path":{"toValue":"%value%"}}, specifies the field to use as a source path
+//      "targetPathField" : {"path":{"toValue":"%value%"}}, specifies the field to use as a target path (required for move or replace)
+//      "action" : specifies the action to execute on the object (move, replace ore delete)
+//      "actionField" : specifies the field to use for the action to execute on the object, this overrules the action setting
+// }
+
+use Concurrency, System, Mongo, Collection, XURL, Date, Assert;
+
+include etlFramework.plugins.filesystem.Helper as FileSystemHelpers;
+
+argument data = Concurrency.testInput({"action":"move", "sourcePathField":{"path":"%value%"}, "targetPathField":{"targetPath":"%value%"}}, [{"path":"F:/test/delete.accdb","targetPath":"F:/delete.accdb"}]);
+
+var object = Concurrency.pop(data.input);
+
+while(object != null){
+    if(object.xillioType == "log"){
+            Concurrency.push(object, data.output);
+    }
+    else
+    {
+        execute(object, data, false);   
+    }
+    object = Concurrency.pop(data.input);
+}
+
+ function execute(object, data, assert){
+    
+    do {
+        
+        // check for action per object
+        if(data.actionField != null){
+            data.action = FileSystemHelpers->getFieldValue(object, data.actionField);
+        }
+        
+        var sourcePath = FileSystemHelpers->getFieldValue(object, data.sourcePathField);
+        var targetPath = FileSystemHelpers->getFieldValue(object, data.targetPathField);
+         
+        if(data.action == "createFolder"){
+            FileSystemHelpers->createFolder(targetPath);
+        }
+        if(data.action == "copy"){
+            FileSystemHelpers->copy(sourcePath, targetPath);
+        }
+        else if(data.action == "move" || data.action == "replace"){
+            var replace = false;
+            if(data.action == replace){
+                replace = true;
+            }
+            
+            FileSystemHelpers->move(sourcePath, targetPath, replace);
+        }
+        else if(data.action == "delete"){
+            FileSystemHelpers->delete(targetPath);
+        }
+
+    }
+    fail(e){
+       if(assert){
+           Assert.error(e.message);
+       }
+       else
+       {
+           Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+       }
+    }
+}
+

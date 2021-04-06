@@ -1,0 +1,11 @@
+use Mongo;
+
+include etlFramework.plugins.mongo.Helper as MongoHelpers;
+
+function createIndex(indexes, collection, mongo)
+{
+    var connection = MongoHelpers->getConnection(mongo);
+    foreach(index in indexes){
+        Mongo.createIndex(collection, index.keys, index.options, connection);
+    }
+}

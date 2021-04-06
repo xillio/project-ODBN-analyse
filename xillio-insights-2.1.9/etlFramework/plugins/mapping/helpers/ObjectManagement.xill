@@ -1,0 +1,106 @@
+use System, String, Collection, Date;
+
+function getFieldValue(object, field){
+    if(System.typeOf(field) != "OBJECT"){
+        return object;
+    }
+    
+    foreach(key, value in field){
+        if(System.typeOf(object[key]) == "OBJECT"){
+            return getFieldValue(object[key], value);
+        }
+        else{
+            return object[key];
+        }
+    }
+}
+
+function setFieldValue(object, field){
+    foreach(key, value in field){
+        if(object[key] == null){
+            object += field;
+        }
+        else
+        {
+            if(System.typeOf(value) == "OBJECT"){
+                object[key] = setFieldValue(object[key], value);
+            }
+            else{
+                object[key] = value;
+            }
+        }
+    }
+    
+    return object;
+}
+
+function prepareField(field, value){
+    var targetFieldJSON = System.toJSON(field);
+    var valueAsJSON = System.toJSON(value);
+    targetFieldJSON = String.replace(targetFieldJSON, "\"%value%\"", valueAsJSON, false, false, 0);
+    field = System.parseJSON(targetFieldJSON);
+    return field;
+}
+
+function format(values, format){
+    var formatAsJSON = System.toJSON(format);
+    var valueMatches = String.allMatches(formatAsJSON, "%value\\d+%");
+    foreach(valueMatch in valueMatches){
+        var key = String.replace(valueMatch, "(%)(value\\d+)(%)", "$2");
+        formatAsJSON = String.replace(formatAsJSON, "%" :: key :: "%", values[key], false, false, 0);
+    }
+
+    formatAsJSON = jsonEscape(formatAsJSON);
+    
+    return System.parseJSON(formatAsJSON);
+}
+
+function parseDates(object, fullPath, dateFields){
+
+    foreach(key, value in object){
+    
+        if(System.typeOf(value) == "OBJECT"){
+        
+            var newFullPath = "";
+            if(fullPath == ""){
+                newFullPath ::= key;
+            }
+            else
+            {
+                newFullPath ::= fullPath :: "." :: key;
+            }
+            
+            object[key] = parseDates(value, newFullPath,  dateFields);
+        }
+        else if(value != System.typeOf("LIST") && Collection.containsKey(dateFields, fullPath :: "." :: key) == true){
+            object[key] = Date.parse(value, dateFields[fullPath :: "." :: key]);
+            return object;
+        }
+        
+    }
+    
+     return object;
+}
+
+
+private function jsonEscape(string){
+    // tab
+    string = String.replace(string, "\t", "\\t", false, true, 0);
+    
+    // backspace
+    string = String.replace(string, "\b", "\\b", false, true, 0);
+    
+    // form feed
+    string = String.replace(string, "\f", "\\f", false, true, 0);
+    
+    // new line
+    string = String.replace(string, "\n", "\\n", false, true, 0);
+    
+    // return
+    string = String.replace(string, "\r", "\\r", false, true, 0);
+    
+    // backslash
+    string = String.replace(string, "\\", "\\\\", false, true, 0);
+    
+    return string;
+}

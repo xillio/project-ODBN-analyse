@@ -1,0 +1,185 @@
+// Description: function to Extract Office 365 using the graph API
+// Config usage:
+// {
+//        "clientId" : "",
+//        "clientSecret" : "",
+//        "tentantId": "",
+//        (optinal) "keyword" : keyword for filtering sites
+//        (optional) "type":  users if null then is sites
+//        (optional) "hashing" : object containg hashing settings"hashing" : {"enabled" : false}
+//        "source" : name of the source, for example livelink,
+//        "toUdm" : specififies whenether to format the object to the udm
+// }
+
+use XURL, System, File, Stream, Concurrency, Date, String, Collection, Encode;
+
+include etlFramework.plugins.xillioapi.Helper as XillioApiHelpers;
+
+    argument data = Concurrency.testInput({},[]);
+
+var token;
+
+init();
+
+var counter = 0;
+
+crawl();
+
+private function crawl(){
+    var repository = getRepository();
+    repository.id = repository.id :: data.contentRoot;
+    var pageNum = 1;
+    // crawlConcurrent(repository);
+    crawlEntities(repository);
+    // // var roots = XillioApiHelpers->entities(repositoryId, data.childType, tokenIsValid(), getOffset(pageNum), data.limit, data.timeout);
+
+    // while(Collection.length(roots[data.childType]) > 0)
+    // {    
+    //     foreach(root in roots[data.childType]){
+            
+    //         do{
+    //             crawlEntities(root.id);
+    //         }
+    //         fail(e){
+    //             System.print("Error fetching roots for repositoryId: " :: root.id, "INFO");
+    //         }
+            
+    //     }
+        
+    //     pageNum++;
+    //     roots = XillioApiHelpers->entities(repositoryId, data.childType, tokenIsValid(), getOffset(pageNum), data.limit, data.timeout);
+    // }
+}
+
+
+function crawlEntities(entity){
+    
+
+    // System.print(entity.xdip);
+    do {
+        var parsedEntity = toUdm(entity);
+        // System.print(parsedEntity);
+        if(parsedEntity.udm != null){
+            System.print(parsedEntity.kind,"debug");
+            push(parsedEntity);
+        }
+    }
+    fail(e){
+        System.print("Error while mapping: " :: entity.original.fileSystem.path :: ", message: " :: e.message, "WARNING");
+    }
+    
+    var pageNum = 1;
+    var entities = XillioApiHelpers->entities(entity.id, "path_children_entity", tokenIsValid(), getOffset(pageNum), data.paginationSettings.limit, data.paginationSettings.timeout);
+    while(Collection.length(entities["path_children_entity"]) > 0){
+        foreach(childEntity in entities["path_children_entity"]){
+            do {
+                // var process = false;
+                // foreach(xFilter in data.xdipFilters){
+                //     if(String.matches(childEntity.xdip, xFilter, 0)){
+                //         process = true;
+                //     }
+                // // }
+                
+                // if(process){
+                    crawlEntities(childEntity);
+                // }
+            }
+            fail(e)
+            {
+              System.print("Incomplete export for: " :: entity.original.fileSystem.path :: ", message: " :: e.message, "WARNING");
+            } 
+            
+            // push(parsedEntity);
+        }
+        
+        pageNum++;
+        entities = XillioApiHelpers->entities(entity.id, "path_children_entity", tokenIsValid(), getOffset(pageNum), data.paginationSettings.limit, data.paginationSettings.timeout);
+    }
+    
+
+}
+
+private function getOffset(pageNum){
+    return (pageNum - 1) * data.paginationSettings.limit;
+}
+
+private function getRepository(){
+    var repositories = XillioApiHelpers->repositories(data.xillioApi.host, tokenIsValid(), data.paginationSettings.timeout);
+    foreach(repository in repositories.children){
+        if(repository.original.name.displayName == data.repositoryName){
+            return repository;
+        }
+    }
+}
+
+private function toUdm(object){
+    
+    object.index = data.index;
+    object.source = data.source;
+    
+    var udm = parseDocument(object);
+    
+    object = XillioApiHelpers->setFieldValue(object, XillioApiHelpers->prepareField({"udm":"%value%"}, udm)); 
+    
+    return object;
+}
+
+private function parseDocument(object){
+    if(data.connectorType == "aem"){
+        return XillioApiHelpers->parseAemDocument(object, data);
+    }
+}
+
+
+private function push(object){
+    Concurrency.push(object, data.output);
+    
+    if(counter % 1000 == 0)
+    {
+        Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed objects(s): " :: counter}, data.output);
+    }
+    
+    counter++;
+    
+}
+
+private function tokenIsValid(){
+    
+    if(token == null || Date.diff(token.tokenTime, Date.now()).totalSeconds > token.expires_in - 120){
+        token = XillioApiHelpers->getToken(data.xillioApi.host, data.xillioApi.clientId, data.xillioApi.clientSecret, data.xillioApi.username, data.xillioApi.password);
+    }
+    return token.access_token;
+}
+
+
+private function init(){
+    
+    if(data.source == null){
+        data.source = "Sharepoint";
+    }
+    
+    if(data.toUdm == null){
+        data.toUdm = true;
+    }
+    
+    if(data.type == null){
+        data.type = "sites";
+    }
+    
+    data.baseUrl = "https://graph.microsoft.com/v1.0/";
+    
+    
+    if(data.subSites == null){
+        data.subSites = [];
+    }
+    
+    if(data.hashing == null){
+        data.hashing = {
+            "enabled" : false
+        };
+    }
+    
+    if(data.keyword == null){
+        data.keyword = "*";
+    }
+}

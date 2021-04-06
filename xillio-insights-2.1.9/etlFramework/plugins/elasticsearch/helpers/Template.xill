@@ -1,0 +1,17 @@
+use XURL, String, Assert;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+function createTemplate(id, configuration, elasticsearch){
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+    var createdTemplate = XURL.put(elasticsearch.host :: "/_template/" :: id, configuration, options);
+    
+    if(String.startsWith(createdTemplate.status.code, "2") != true){
+        Assert.error("Elasticsearch error! " :: createdTemplate.body.error);
+    }
+    else
+    {
+        return createdTemplate;
+    }
+    
+}

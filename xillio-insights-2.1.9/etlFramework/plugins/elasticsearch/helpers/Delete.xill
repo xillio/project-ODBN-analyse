@@ -1,0 +1,20 @@
+use XURL, Assert, String, Collection;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+function deleteDocument(id, index, elasticsearch){
+    
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+    
+    var url = elasticsearch.host :: "/" :: index ::"/_doc/" :: id;
+    
+    var result = XURL.delete(url, options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        Assert.error("Elasticsearch error! " :: result.body.error);
+    }
+    else
+    {
+        return result;
+    }
+}

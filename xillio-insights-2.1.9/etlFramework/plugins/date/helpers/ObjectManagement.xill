@@ -1,0 +1,28 @@
+use System, String, Collection, Date;
+
+function parseDates(object, fullPath, dateFields){
+
+    foreach(key, value in object){
+    
+        if(System.typeOf(value) == "OBJECT"){
+        
+            var newFullPath = "";
+            if(fullPath == ""){
+                newFullPath ::= key;
+            }
+            else
+            {
+                newFullPath ::= fullPath :: "." :: key;
+            }
+            
+            object[key] = parseDates(value, newFullPath,  dateFields);
+        }
+        else if(value != System.typeOf("LIST") && Collection.containsKey(dateFields, fullPath :: "." :: key) == true){
+            object[key] = Date.parse(value, dateFields[fullPath :: "." :: key]);
+            return object;
+        }
+        
+    }
+    
+     return object;
+}

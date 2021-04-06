@@ -1,0 +1,72 @@
+// Description: calculates an hash for a file
+// Config usage:
+// {
+//      "pathSourceField" : {"path":{"toValue":"%value%"}}, specifies the field to use as a path to the file
+//      "targetField" : {"path":{"toValue":"%value%"}}, specifies where to add the hash to the object
+//      "smartHashing" : when smart hashing is enabled only objects that are flaged to be hashed are processed, else the object is just pushed to the next queue
+// }
+
+use Concurrency, File, Stream, Hash, System, String, Date, Web;
+
+include etlFramework.plugins.hash.Helper as HashHelpers;
+
+argument data = Concurrency.testInput({},[]);
+
+init();
+
+var object = Concurrency.pop(data.input);
+
+while(object != null){
+    if(object.xillioType == "log"){
+        Concurrency.push(object, data.output);
+    }
+    else
+    {   
+        if(object.generateHash == true){
+        
+            do {
+                var pathToFile = HashHelpers->getFieldValue(object, data.pathSourceField);
+                
+                // var file;
+                if(String.matches(pathToFile, "http(s)?:.*", 60))
+                {
+                    Web.download(pathToFile, data.tempPath :: "/" :: Hash.toMD5(pathToFile), null, 0);
+                    pathToFile = data.tempPath :: "/" :: Hash.toMD5(pathToFile);
+                }
+                // else
+                // {
+                var file = File.openRead(pathToFile);
+                // }
+                var md5 = String.toUpper(Hash.toMD5(file));
+                
+                object = HashHelpers->setFieldValue(object, HashHelpers->prepareField(data.targetField, md5));
+                Concurrency.push(object, data.output);
+            }
+            fail(e){
+                Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+            }
+        }
+        else
+        {
+            Concurrency.push(object, data.output);
+        }
+    }
+    
+    object = Concurrency.pop(data.input);
+}
+
+
+private function init(){
+    
+    if(data.pathSourceField == null){
+        data.pathSourceField = {"udm":{"binaryPath":"%value%"}};
+    }
+    
+    if(data.targetField == null){
+        data.targetField = {"udm":{"binaryHash":"%value%"}};       
+    }
+    
+    if(data.tempPath == null) {
+        data.tempPath = "c:/temp";
+    }
+}

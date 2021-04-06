@@ -1,0 +1,13 @@
+function getConnectionOptions(kibana){
+    var options = {"headers":{"Content-Type" : "application/json"}};
+
+    if(kibana.authenticationEnabled == true){
+        var basicAuth = {
+            "username" : kibana.username,
+            "password" : kibana.password
+        };
+        options += {"basicAuth" : basicAuth};
+    }
+    
+    return options;
+}

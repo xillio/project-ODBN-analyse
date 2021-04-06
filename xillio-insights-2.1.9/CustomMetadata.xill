@@ -1,0 +1,35 @@
+use Concurrency,System;
+
+argument data = Concurrency.testInput({}, []);
+
+var object = Concurrency.pop(data.input);
+
+System.print("in Custom");
+
+while(object != null){
+    if(object.xillioType == "log"){
+        Concurrency.push(object, data.output);
+    }
+    else
+    {
+        System.print("in Custom print object "::  object.properties); 
+        var metadata = {};
+
+        // extend robot to fill the metadata object
+       // metadata = object.properties["additional-metadata"];
+        
+        foreach (key,value in object.properties["additional-metadata"]){
+            
+            metadata[key] = value;
+             System.print("in CustomMetadata print key-value "::  key::"-"::value,"WARNING"); 
+        }
+        
+        object.udm.metadata = metadata;
+
+        Concurrency.push(object, data.output);
+    }
+
+    object = Concurrency.pop(data.input);
+}
+
+

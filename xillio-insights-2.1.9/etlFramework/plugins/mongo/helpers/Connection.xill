@@ -1,0 +1,6 @@
+use Mongo;
+
+function getConnection(mongo){
+    var connection = Mongo.connect(mongo.name, mongo.host, mongo.port, mongo.username, mongo.password);
+    return connection;
+}

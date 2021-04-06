@@ -1,0 +1,16 @@
+use XURL, String;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+function getTask(id, elasticsearch){
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+    var task = XURL.get(elasticsearch.host :: "/_tasks/" :: id, options);
+    
+    if(String.startsWith(task.status.code, "2") != true){
+        Assert.error("Elasticsearch error! " :: task.body.error);
+    }
+    else
+    {
+        return task;
+    }
+}

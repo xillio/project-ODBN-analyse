@@ -1,0 +1,268 @@
+// Description on how to use. The ETL function should contain a description on how it should be used.
+// {
+//   "__name_of_repository": {
+//     "type": "livelink",
+//     "config": {
+//       "database": "__name_of_mongo_database__",
+//       "collection": "__name_of_mongo_database__",
+//       "folder": "__location_of_binaries__"
+//     }
+//   }
+// }
+
+use Concurrency, System, Mongo, Collection, XURL, Assert, Date, String, Hash, Stream, File, Math;
+
+include etlFramework.plugins.otcs.Helper as otcsHelpers;
+
+argument data = Concurrency.testInput({"database": "udm_harvard_otcs",
+      "collection": "documents"}, []);
+
+
+var database = Mongo.connect(data.database);
+var counter = 0;
+
+init();
+
+execute();
+
+// The execute function must contain the main processing logic.
+// For a source function this means at least getting the object from the source system and pushing it to the next queue. A source function doesn't contain a starting queue.
+// A source function must have a `source` property in the config that is added to the object extracted from the source system.
+// This property must be filled with a name specifying the source system.
+// For a transformation function you can basicly do anything with the object as long as it get the objects from a previous queue and pushes it to the next queue, use the boilerplate function below.
+// A target function doesn't push anything to the next queue but only executes a action on a (target) system, use the boilerplate function below.
+
+function execute()
+{  
+    var objects = Mongo.find(data.collection);
+    foreach (object in objects) {
+   do
+   {
+        // Write the function code here and push the the resulting object to the next queue (except for target functions)
+                
+        object.index = data.index;
+        // object.source = data.source;
+                
+        if(data.toUdm == true){
+            object = toUdm(object);
+        }
+        Concurrency.push(object, data.output);
+        
+   }
+   fail(e)
+   {
+       
+       
+       // Checks the assert value for true or false. When extending the functionality of the function, set to true so you can implement your own error handeling.
+       if(data.assert){
+           Assert.error(e.message);
+       }
+       else
+       {
+           Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+       }
+   }
+   
+   if(counter % 1000 == 0)
+    {
+        Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed objects(s): " :: counter}, data.output);
+    }
+    
+    counter++;
+   }
+   
+}
+
+private function toUdm(object){
+    
+    var udm = parseDocument(object);
+    object = otcsHelpers->setFieldValue(object, otcsHelpers->prepareField({"udm":"%value%"}, udm)); 
+    return object;
+}
+
+private function parseDocument(object){
+    var formatted = {};
+    if (object.kind != "Instance" && object.kind != "Step") {
+        var obj = object.modified;
+
+        formatted._id = object._id;
+        formatted.id = object._id;
+        formatted.reversedVersionOrder = 1;
+        
+        formatted.subType = obj.contentType.displayName;
+        formatted.name = obj.name.displayName;
+        if (obj.parent.path == "") {
+            formatted.parent = "root";
+            formatted.hierarchy = obj.name.displayName;
+        } else {
+            formatted.parent = obj.parent.path;
+            formatted.hierarchy = obj.parent.path::"/"::obj.name.displayName;
+        }
+        if (obj.lastaccessed) {
+            formatted.dateAccessed = obj.lastaccessed.date;
+            formatted.principalAccessed = obj.lastaccessed.by.displayName;
+        }
+        formatted.dateCreated = obj.created.date;
+        formatted.principalCreated = obj.created.by.displayName;
+        formatted.dateModified = obj.modified.date;
+        formatted.principalModified = obj.modified.by.displayName;
+        
+        if(object.kind == "Folder")
+        {
+            formatted.type = "Container";
+            
+            formatted.isFile = false;
+            
+        } else {
+            formatted.type = object.kind;
+    	    formatted.isFile = true;
+    	    
+            
+            if (Collection.length(object.modified.versions)>1) {
+                formatted.versionCount = Collection.length(object.modified.versions);
+            } else {
+                formatted.versionCount = 1;
+            }
+            formatted.binaryExtension = obj.file.rawExtension;
+            formatted.binaryByteSize = obj.file.size;
+            formatted.binaryByteSizeAsNumber = obj.file.size;
+            if (obj.hash) {
+               formatted.binaryHash = obj.hash.md5;
+            }
+        }
+        
+        formatted.source = "dfci";
+        formatted.state = [];
+        
+        
+        formatted.metadata = {};
+        formatted.metadata["DataId"] = Math.abs(formatted.id);
+        if (obj.audit) {
+            formatted.metadata["numberOfAudits"] = Collection.length(obj.audit);
+            formatted.metadata["auditTypes"] = [];
+            formatted.metadata["performers"] = [];
+            formatted.metadata["dates"] = [];
+            foreach (a in obj.audit) {
+                formatted.metadata["auditTypes"][] = a.AUDITSTR;
+                var performer = Mongo.findOne("UsersAndGroups", {"_id": a.PERFORMERID}, {"NAME": 1}, {}, {}, database);
+                formatted.metadata["performers"][] = performer.NAME;
+                formatted.metadata["dates"][] = a.AUDITDATE;
+            }
+        }
+        if (obj.permissions) {
+            formatted.metadata["permissions"] = {};
+            foreach (user, data in obj.permissions.users) {
+                foreach (k, v in data.permissions) {
+                    if (!formatted.metadata.permissions[k]) {
+                        formatted.metadata.permissions[k] = [];
+                        if (v) {
+                            formatted.metadata.permissions[k][] = user;
+                        }
+                    } else {
+                        if (v) {
+                            formatted.metadata.permissions[k][] = user;
+                        }
+                    }
+                }
+            }
+            foreach (group, data in obj.permissions.groups) {
+                foreach (k, v in data.permissions) {
+                    if (!formatted.metadata.permissions[k]) {
+                        formatted.metadata.permissions[k] = [];
+                        if (v) {
+                            formatted.metadata.permissions[k][] = group;
+                        }
+                    } else {
+                        if (v) {
+                            formatted.metadata.permissions[k][] = group;
+                        }
+                    }
+                }
+            }
+        }
+        // formatted.metadata["users"] = {};
+        // formatted.metadata["users"]["created"] = obj.created.by.userInfo;
+        // formatted.metadata["users"]["modified"] = obj.modified.by.userInfo;
+        // formatted.metadata["users"]["lastAccessed"] = obj.lastaccessed.by.userInfo;
+        if (formatted.subType == "Workflow Map") {
+            formatted.metadata["workflowData"] = {"owner": obj.created.by.userInfo.NAME};
+        }
+    } else {
+        
+        formatted._id = object._id;
+        formatted.id = object._id;
+        formatted.reversedVersionOrder = 1;
+        formatted.name = object.title;
+        formatted.parent = ""::object.parent;
+        formatted.hierarchy = object.path;
+        
+        // formatted.principalAccessed = obj.lastaccessed.by.userInfo.NAME;
+        formatted.dateCreated = Date.now();
+        // formatted.principalCreated = obj.created.by.userInfo.NAME;
+        formatted.dateModified = Date.now();
+        // formatted.principalModified = obj.modified.by.userInfo.NAME;
+         formatted.type = "Container";
+         formatted.subType = object.kind;
+         formatted.isFile = false;
+        
+        formatted.source = "dfci";
+        formatted.state = [];
+        formatted.metadata = {};
+        formatted.metadata["dueDate"] = object.dueDate;
+        if (object.kind == "Step") {
+            formatted.metadata["performer"] = object.performer;
+            formatted.metadata["taskStatus"] = object.taskStatus;
+            formatted.metadata["startDateTask"] = object.startDate;
+        } else {
+            formatted.metadata["dateInitiated"] = object.dateInitiated;
+            formatted.metadata["numberOfDocuments"] = object["number of documents"];
+            formatted.metadata["numberOfFolders"] = object["number of folders"];
+        }
+    }
+    return formatted;
+        
+}
+
+private function parseError(object){
+    var parsedError = {
+        "timestamp" : Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"),
+        "xillioType" : "log",
+        "xillioSubtype" : "error",
+        "xillioMessage" : object.auditLog[0].exception.type,
+        "xillioObject" : object.path
+    };
+    
+    return parsedError;
+}
+
+private function normalizePath(path){
+    return String.replace(path,"\\","/", false, true, 0);
+}
+
+function pathToName(path) {
+     path = String.replace(path, "(.*[/])(.*)", "$2");
+     path = String.replace(path, "(\\.[\\-0-9a-zA-Z]+)$", "");
+     return path;
+}
+
+function pathToExtension(path) {
+     var ext = String.replace(path, "(.*)([/])(.*\\.)([/-0-9a-zA-Z]+)$", "$4");
+     // required because Xill returns the entire string if no match is found!
+     if (String.length(ext) == String.length(path)) {
+          ext = null;
+     }
+     return (ext);
+}
+
+private function init(){
+    
+    // if(data.source == null){
+    //     data.source = "OpenTextContentServer";
+    // }
+    // if(data.index == null){
+    //     data.index = "OpenTextContentServer";
+    // }
+    if(data.toUdm == null){
+        data.toUdm = true;
+    }
+}

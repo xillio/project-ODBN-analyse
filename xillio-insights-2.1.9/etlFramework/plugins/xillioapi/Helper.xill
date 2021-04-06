@@ -1,0 +1,5 @@
+include etlFramework.plugins.xillioapi.helpers.Connection;
+include etlFramework.plugins.xillioapi.helpers.ObjectManagement;
+include etlFramework.plugins.xillioapi.helpers.API;
+include etlFramework.plugins.xillioapi.helpers.CommonMapper;
+include etlFramework.plugins.xillioapi.helpers.AemMapper;

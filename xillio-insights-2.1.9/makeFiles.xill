@@ -1,0 +1,18 @@
+use System, File, Math, String, Stream, Collection, String;
+
+var jsonPath = "c:/insights/pipeOutput/scraper/metadata/files-0.jsonline"; 
+
+var jsonfile = File.openRead(jsonPath);
+var contentTypes = [];
+foreach (line in Stream.iterate(jsonfile)) {
+    var json = System.parseJSON(line); 
+    
+    if (!Collection.contains(contentTypes, json.properties["additional-metadata"]["Content-Type"]) ) {
+        contentTypes[] = json.properties["additional-metadata"]["Content-Type"];
+    }
+    
+}
+
+foreach (t in contentTypes) {
+        System.print(t);
+    }

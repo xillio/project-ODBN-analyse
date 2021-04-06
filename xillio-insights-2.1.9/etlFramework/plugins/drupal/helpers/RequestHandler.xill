@@ -1,0 +1,87 @@
+use XURL, Date, System;
+
+// performs a GET
+function GET(state, url) {
+    var options = {
+        "headers" : {
+            "Content-Type" : "application/json",
+            "X-CSRF-Token" : state.token,
+        },        
+    };
+
+    var result = XURL.get(state.host::url, options);
+    return result;
+}
+
+// performs a POST
+function POST(state, url, body) {
+    var options = {
+        "headers" : {
+            "Content-Type" : "application/json",
+            "X-CSRF-Token" : state.token,
+        },   
+        // "timeout" : 300000
+    };
+
+    var startTime = Date.now();
+
+    var result = XURL.post(state.host::url, body, options);
+
+    var finishTime = Date.now();
+    var diff = Date.diff(startTime, finishTime);
+    System.print("\tResponse time: "::diff.totalMillis);    
+    
+    return result;    
+}
+
+// performs a POST HAL+JSON, required for File API to work
+function POST_HALJSON(state, url, body) {
+    var options = {
+        "headers" : {
+            "Content-Type" : "application/hal+json",
+            "X-CSRF-Token" : state.token,
+        },        
+    };
+
+    var result = XURL.post(state.host::url, body, options);
+    return result;    
+}
+
+// performs a PATCH
+function PATCH(state, url, body) {
+    var options = {
+        "headers" : {
+            "Content-Type" : "application/json",
+            "X-CSRF-Token" : state.token,
+        },        
+    };
+
+    var result = XURL.patch(state.host::url, body, options);
+    return result;    
+}
+
+// performs a PATCH HAL+JSON, required for File API to work
+function PATCH_HALJSON(state, url, body) {
+    var options = {
+        "headers" : {
+            "Content-Type" : "application/hal+json",
+            "X-CSRF-Token" : state.token,
+        },        
+    };
+
+    var result = XURL.patch(state.host::url, body, options);
+    return result;    
+}
+
+// performs a DELETE
+function DELETE(state, url) {
+    var options = {
+        "headers" : {
+            "Content-Type" : "application/json",
+            "X-CSRF-Token" : state.token,
+        },        
+    };
+
+    var result = XURL.delete(state.host::url, options);
+    return result;    
+}

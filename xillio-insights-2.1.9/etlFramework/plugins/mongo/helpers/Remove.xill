@@ -1,0 +1,8 @@
+use Mongo;
+
+include etlFramework.plugins.mongo.Helper as MongoHelpers;
+
+function remove(collection, query, mongo){
+    var connection = MongoHelpers->getConnection(mongo);
+    return Mongo.remove(collection, query, connection);
+}

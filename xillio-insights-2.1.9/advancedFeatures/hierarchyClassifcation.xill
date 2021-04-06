@@ -1,0 +1,63 @@
+use System, Excel, Stream, File;
+
+include etlFramework.Settings as Settings;
+include Commons as Commons;
+
+var settings = Settings->getSettings();
+
+var mappingWbPath = settings.configFolder :: "/" :: "hierarchyMapping.xlsx";
+var wb = Excel.loadWorkbook(mappingWbPath);
+
+var sheetNames = Excel.getSheetNames(wb);
+
+var classificationSettings = System.parseJSON(Stream.getText(File.openRead(settings.configFolder :: "/classification.json")));
+classificationSettings += updateClassificationSettings();
+Stream.write(System.toJSON(classificationSettings, true), File.openWrite(settings.configFolder :: "/classification.json"));
+
+Commons->initClassification();
+
+System.print("Classification settings updated!", "INFO");
+
+
+private function updateClassificationSettings(){
+    var classificationSettings = {};
+    foreach(sheetName in sheetNames){
+        var sheet = Excel.loadSheet(wb, sheetName);
+        
+        var row = 2;
+        var maxRows = Excel.rowCount(sheet);
+        
+        var resultValues = {};
+        
+        while(row <= maxRows)
+        {
+            var hierarchy = Excel.getCell(sheet, 1, row);
+            var resultValue = Excel.getCell(sheet, 2, row);
+            
+            if(hierarchy != null && resultValue != null){
+                if(resultValues[resultValue] == null){
+                    resultValues[resultValue] =
+                      {
+                         "analyticsClassificationQuery" : {
+                            "terms": {
+                              "hierarchy.tree": []
+                            }
+                          },
+                          "analyticsClassificationResult" : resultValue
+                    };
+                }
+                
+                resultValues[resultValue].analyticsClassificationQuery.terms["hierarchy.tree"][] = hierarchy;
+            }
+            
+            row++;
+        }
+        
+        classificationSettings[sheetName] = [];
+        foreach(resultValue in resultValues){
+            classificationSettings[sheetName][] = resultValue;
+        }
+    }
+    
+    return classificationSettings;
+}

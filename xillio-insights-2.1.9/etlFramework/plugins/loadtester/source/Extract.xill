@@ -1,0 +1,60 @@
+// Description: generates 'random' objects to to load testing on pipelines, queries and databases. Addes a category hierarchy for Elasticsearch aggregations
+// Config usage:
+// {
+//      "maxCount" : 400000000,
+//      "categories" : ["dieren/zoogdieren/aap", "dieren/vissen/baars", "dieren/vogels/mus"]
+// }
+
+use Mongo, Properties, Document, System, Hash, File, Math, Stream, Concurrency, Date, String, Collection;
+
+argument data = Concurrency.testInput({}, []);
+
+var counter = 0;
+var possibleCategories = data.categories;
+var maxCount = data.maxCount;
+
+generateObjects(data.maxCount);
+
+private function generateObjects(maxCount) {
+    do {
+        while(maxCount>counter) {
+            counter++;
+            if(counter % 10000 == 0) {
+                Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Generated " :: counter :: " objects"}, data.output);
+            }
+            
+            var count = Math.random(maxCount);
+            var category = Math.random(possibleCategories);
+            
+            var testObject = {
+                "id" : Mongo.uuid(null),
+                "count" : count,
+                "category" : category,
+                "categoryHierarchy" : getPaths(category) 
+            };
+            
+            Concurrency.push(testObject, data.output);
+        }
+    } 
+    fail(e) {
+        Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":null}, data.output);
+    }
+}
+
+private function getPaths(path){
+    var paths = [];
+    
+    var pathsTemp = String.split(path, "/");
+    var prevPath = "";
+    foreach(p in pathsTemp){
+        if(prevPath != ""){
+            prevPath ::= "/";
+        }
+        paths[] = prevPath :: p;
+        prevPath = prevPath :: p;
+    }
+    
+    Collection.remove(paths, Collection.length(paths)-1);
+    
+    return paths;
+}

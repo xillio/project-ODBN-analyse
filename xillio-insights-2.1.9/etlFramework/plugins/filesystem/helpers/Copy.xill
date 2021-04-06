@@ -1,0 +1,12 @@
+use System, File, Collection, String;
+
+function copy(sourcePath, targetPath){
+    sourcePath = normalizePath(sourcePath);
+    targetPath = normalizePath(targetPath);
+
+    File.copy(sourcePath, targetPath);
+}
+
+private function normalizePath(path){
+    return String.replace(path,"\\","/", false, true, 0);
+}

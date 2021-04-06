@@ -1,0 +1,37 @@
+{
+  "modules": {
+		"getFiles": {
+			"type": "filescraper",
+			"rootDir": "M:/",
+			"zoneId": "UTC",
+			"dateTimePattern": "yyyy-MM-dd'T'HH:mm:ss.SSSX",
+			"filesTo": [
+				"files"
+			],
+			"foldersTo": [
+				"folders"
+			],
+			"errorsTo" : [
+				"errors" 
+			] 
+		},
+    "files": {
+      "type": "jsonlineWriter",
+      "preClean" : "true",
+      "filePrefix": "files",
+      "outputDir" : "F:/data/pipe/extract/m-drive/files" 
+    },
+    "folders": {
+      "type": "jsonlineWriter",
+      "filePrefix": "folders",
+      "preClean" : "true",
+     "outputDir" : "F:/data/pipe/extract/m-drive/files" 
+    },
+    "errors": {
+      "type": "jsonlineWriter",
+      "filePrefix": "errors",
+      "preClean" : "true",
+      "outputDir" : "F:/data/pipe/extract/m-drive/errors" 
+    }
+  }
+}

@@ -1,0 +1,97 @@
+// Description: gets the delete objects from elasticsearch
+// Config usage:
+// {
+//      "pathParsers":[{"regex":"C:\\\\(.*)","replacement":"Z:\\\\$1"}], array of path parsers to resolve the binaryPath relative to the server
+// }
+
+use System, Excel, Stream, File, Concurrency, Date, Collection, String;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+argument data = Concurrency.testInput({}, []);
+
+var query = {
+    "size" : 1000,
+    "sort" : [
+        { "type" : {"order" : "desc"}},
+        { "hierarchy.depth" : {"order" : "desc"}}
+    ],
+    "query" : {
+        "bool": {
+          "filter": [
+                {
+                    "term" : {
+                        "type" : data.type
+                    }
+                },
+               {
+                   "term" : {
+                       "cleanAction" : "delete"
+                   }
+               },
+               {
+                 "terms" : {
+                   "cleanResult" : ["new","retry-1","retry-2"]
+                 }
+               }
+          ]
+        }
+    }
+};
+
+var processing = true;
+
+var counter = 0;
+
+var files = ElasticsearchHelpers->search(data.index, query, true, "30m", data.elasticsearch);
+
+while(processing){
+    
+    if(Collection.length(files.body.hits.hits) == 0){
+        processing = false;
+    }
+        
+    foreach(hit in files.body.hits.hits){
+        
+        if(counter % 1000 == 0)
+        {
+            Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed object(s): " :: counter}, data.output);
+        }
+        
+        // apply path replaces
+    
+        var deleteObject = {
+            "_id" : hit._id,
+            "_index" : hit._index,
+            "path" : parsePath(hit._source.hierarchy),
+            "action" : hit._source.cleanAction,
+            "result" : hit._source.cleanResult,
+        };
+        
+        Concurrency.push(deleteObject, data.output);
+        counter++;
+    }
+        
+    files = ElasticsearchHelpers->scroll(files.body._scroll_id, "30m", data.elasticsearch);
+}
+
+ElasticsearchHelpers->deleteScroll(files.body._scroll_id, data.elasticsearch);
+
+private function parsePath(path){
+    
+    if(Collection.length(data.pathParsers) > 0){
+        foreach(parser in data.pathParsers)
+        {
+            if(parser.regex == null){
+                return path;
+            }
+            else if(String.matches(path, parser.regex, 60)){
+                return String.replace(path, parser.regex, parser.replacement, true, 0, 60);
+            }
+        }
+    }
+    else
+    {
+        return path;
+    }
+}

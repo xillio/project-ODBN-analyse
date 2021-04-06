@@ -1,0 +1,29 @@
+use XURL, String, Assert;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+function scroll(id, keepAlive, elasticsearch){
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+    var result = XURL.post(elasticsearch.host :: "/_search/scroll", {"scroll" : keepAlive, "scroll_id": id}, options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        Assert.error("Elasticsearch error! " :: result.body.error);
+    }
+    else
+    {
+        return result;
+    }
+}
+
+function deleteScroll(id, elasticsearch){
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+    var result = XURL.delete(elasticsearch.host :: "/_search/scroll/" :: id, options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        Assert.error("Elasticsearch error! " :: result.body.error);
+    }
+    else
+    {
+        return result;
+    }
+}

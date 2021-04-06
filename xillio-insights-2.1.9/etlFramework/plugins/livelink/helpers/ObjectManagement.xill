@@ -1,0 +1,46 @@
+// Example helper plugin which is included in almost all plugins because it gives you some powerful functions to manage objects
+
+
+use System, String;
+
+function getFieldValue(object, field){
+    if(System.typeOf(field) != "OBJECT"){
+        return object;
+    }
+    
+    foreach(key, value in field){
+        if(System.typeOf(object[key]) == "OBJECT"){
+            return getFieldValue(object[key], value);
+        }
+        else{
+            return object[key];
+        }
+    }
+}
+
+function setFieldValue(object, field){
+    foreach(key, value in field){
+        if(object[key] == null){
+            object += field;
+        }
+        else
+        {
+            if(System.typeOf(value) == "OBJECT"){
+                object[key] = setFieldValue(object[key], value);
+            }
+            else{
+                object[key] = value;
+            }
+        }
+    }
+    
+    return object;
+}
+
+function prepareField(field, value){
+    var targetFieldJSON = System.toJSON(field);
+    var valueAsJSON = System.toJSON(value);
+    targetFieldJSON = String.replace(targetFieldJSON, "\"%value%\"", valueAsJSON, false, false, 0);
+    field = System.parseJSON(targetFieldJSON);
+    return field;
+}

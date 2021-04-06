@@ -1,0 +1,249 @@
+// Description: extracts attachments related to workflows or documents from Exact Synergy
+// Config usage:
+// {
+//      "mongo" : object containing the Mongo settings {"name" : "livelink", "host" : "localhost", "port" : 27017, "username" : null, "password" : null}
+//      (optional) "mongoOptions" : // object containing the options for the Mongo connection
+//      (optional) "collection" : the name of the collection that contains the livelink documents
+//      (optional) "query" : a query to select/filter the objects from Mongo
+//      (optional) "hashing" : object containg hashing settings"hashing" : {"enabled" : false,"versions" : false}
+//      (optional) "source" : name of the source, for example livelink,
+//      (optional) "toUdm" : specififies whenether to format the object to the udm,
+//      "pathParsers":[{"regex":"C:\\\\(.*)","replacement":"Z:\\\\$1"}], array of path parsers to resolve the binaryPath relative to the server
+//      "accessTypes" : ["Fetch","View","Create","PermChange"], list of audit types that are considered access to an object
+// }
+
+use Concurrency, System, Mongo, Collection, File, Stream, Date, String;
+
+include etlFramework.plugins.livelinkm.Helper as LivelinkmHelpers;
+
+argument data = Concurrency.testInput({"collection":"documents","query":{}, "mongo":{"host":"localhost","name":"fca", "port":"27017"}}, []);
+
+init();
+
+var connection = LivelinkmHelpers->getConnection(data.mongo);  
+
+var objects = Mongo.find(data.collection, data.query, {}, {}, data.mongoOptions, connection);
+
+foreach(counter, object in objects){
+
+    if(counter % 1000 == 0)
+    {
+        Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed objects(s): " :: counter}, data.output);
+    }
+    
+    object.index = data.index;
+    object.source = data.source;
+    object.versionCount = Collection.length(object.original.versionHistory) + 1;
+    object.reversedVersionOrder = 1;
+    object.isVersion = false;
+    
+    object = processBinaryPath(object);
+    
+    if(data.toUdm == true){
+        object = toUdm(object);
+    }
+
+    processVersions(object);
+    
+    Concurrency.push(object, data.output);
+}
+
+private function processVersions(object){
+    var versionsSorted = {};
+    
+    if(object.original.versionHistory != null){
+        foreach(version in object.original.versionHistory)
+        {
+            versionsSorted[version.version.number] = version;
+        }
+    
+        versionsSorted = Collection.sort(versionsSorted, false, true, true);
+        var reversedVersionOrder = 2;
+        
+        Collection.remove(object, "audit");
+        Collection.remove(object, "versionHistory");
+        
+        var versionObject = Collection.duplicate(object);
+        
+        foreach(version in versionsSorted){
+            
+            versionObject.original = version;
+            versionObject.original.parent = object.original.parent ;
+            versionObject.reversedVersionOrder = reversedVersionOrder;
+            versionObject.isVersion = true;
+            
+            versionObject = processBinaryPath(versionObject);
+            
+            if(data.toUdm == true){
+                versionObject = toUdm(versionObject);
+            }
+            Concurrency.push(versionObject, data.output);
+            reversedVersionOrder++;
+        }
+    }
+}
+
+private function processBinaryPath(object){
+    if(object.original.file != null && data.hashing.enabled == true){
+        var binaryPath = parseBinaryPath(object.original.opentext.ProviderData.iniValue :: object.original.opentext.ProviderData.providerInfo);
+        object.binaryPath = binaryPath;
+        
+        if(data.hashing.enabled == true && (object.isVersion == false || data.hashing.versions == true)){
+            object.generateHash = true;
+        }
+    }
+    
+    return object;
+}
+
+private function parseBinaryPath(path){
+    foreach(parser in data.pathParsers)
+    {
+        if(parser.regex == null){
+            return path;
+        }
+        else if(String.matches(path, parser.regex, 60)){
+            return String.replace(path, parser.regex, parser.replacement, true, 0, 60);
+        }
+    }
+}
+
+private function toUdm(object){
+    
+    var udm = parseDocument(object);
+    
+    object = LivelinkmHelpers->setFieldValue(object, LivelinkmHelpers ->prepareField({"udm":"%value%"}, udm)); 
+    
+    return object;
+}
+
+private function parseDocument(object){
+    
+    var formatted = {};
+    
+    formatted._id = object._id :: object.original.version.id;
+    formatted.id = object._id;
+    formatted.versionCount = object.versionCount;
+    formatted.reversedVersionOrder = object.reversedVersionOrder;
+    formatted.type = object.kind;
+    formatted.subType = object.original.contentType.displayName;
+    
+    if(object.original.file != null){
+        formatted.isFile = true;    
+    }
+    else
+    {
+        formatted.isFile = false;
+    }
+    
+    formatted.source = object.source;
+    formatted.name = object.original.name.displayName;
+    formatted.state = [];
+    
+    if(object.original.opentext.sensitivity != null){
+        formatted.state[] = object.original.opentext.sensitivity;
+    }
+    
+    var hierarchy = Collection.duplicate(object.original.parent.path);
+    hierarchy[] = object.original.name.systemName;
+    formatted.hierarchy = String.join(hierarchy, "/");
+    
+    formatted.parent = getParentFromHierarchy(formatted.hierarchy);
+    
+    
+    formatted.dateCreated = Date.format(object.original.created.date,"yyy-MM-dd'T'HH:mm:ssX");
+    formatted.dateModified = Date.format(object.original.modified.date,"yyy-MM-dd'T'HH:mm:ssX");
+    
+    
+    if(object.original.created.by != null && object.original.created.by.displayName) {
+        formatted.principalCreated = object.original.created.by.displayName;
+    }
+    
+    if(object.original.modified.by != null && object.original.modified.by.displayName) {
+        formatted.principalModified = object.original.modified.by.displayName;
+    }
+    
+    if(object.isVersion == false){
+        formatted.dateAccessed = getLastAccessed(object.audit);
+    }
+    
+    
+	if(object.original.file != null){
+		formatted.binaryExtension = object.original.file.extension;
+		formatted.binaryByteSize = object.original.file.size;
+		formatted.binaryByteSizeAsNumber = object.original.file.size;
+	}
+	
+	formatted.binaryPath = object.binaryPath;
+	
+	formatted.language = "undefined";    
+    formatted.isOriginalLanguage = true;
+    formatted.deletedFromSource = false;
+    
+    return formatted;
+        
+}
+
+
+private function getLastAccessed(audits){
+    
+    var dates = getAccessed(audits);
+    
+    var lastDate;
+    foreach(date in dates){
+        if(lastDate == null){
+            lastDate = date;
+        }
+        if(Date.isAfter(date, lastDate)){
+            lastDate = date;
+        }
+    }
+    return lastDate;
+}
+
+private function getAccessed(audits){
+     var dates = [];
+     foreach(audit in audits){
+        if(Collection.contains(data.accessTypes, audit.DAUDITNEW.AUDITSTR)) // if within accesstypes
+        {
+            dates[] = audit.DAUDITNEW.AUDITDATE;
+        }
+    }
+    
+    return dates;
+}
+
+private function getParentFromHierarchy(hierarchy){
+    return String.replace(hierarchy, "(.*)\\/.*", "$1", true);
+}
+
+private function init(){
+    
+    if(data.collection == null){
+        data.collection = "documents";
+    }
+    
+    
+    if(data.hashing == null){
+        data.hashing = {
+            "enabled" : false,
+            "versions" : false
+        };
+    }
+    
+    if(data.source == null){
+        data.source = "Linklink";
+    }
+    
+    if(data.toUdm == null){
+        data.toUdm = true;
+    }
+    
+    if(data.query == null){ 
+        data.query = {};
+    }
+    
+    if(data.mongoOptions == null){
+        data.mongoOptions = {}; 
+    }
+}

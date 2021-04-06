@@ -1,0 +1,318 @@
+use System, Concurrency, Date, File, String, Collection;
+
+include etlFramework.Settings as Settings;
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+include etlFramework.plugins.kibana.Helper as KibanaHelpers;
+
+var settings = Settings->getSettings();
+
+initRepositories();
+classificationAnalysis();
+duplicateAnalysis();
+sameParentAnalysis();
+emptyContainerAnalysis();
+translationAnalysis();
+structureAnalysis();
+linkAnalysis();
+
+
+private function initRepositories(){
+    if(!Collection.length(settings.general.analysisRepositories) > 0){
+        foreach(name, repositorySettings in settings.repositories)
+        {
+            settings.general.analysisRepositories[] = name;
+        }
+    }
+}
+
+private function linkAnalysis(){
+    System.print("Start link analysis.", "INFO");
+    
+    if(Collection.contains(settings.general.enabledAnalysisTypes, "links") == true){
+    
+        ElasticsearchHelpers->deleteIndex(settings.system.linkIndexPattern, settings.general.elasticsearch);
+        
+        var pipelineLinkAnalysis = [
+            {
+                "robot" : "analysis/LinkAnalysis.xill",
+                "threadCount" : 1,
+                "config" : {
+                    "elasticsearch" : settings.general.elasticsearch,
+                    "index" : settings.system.defaultIndexPattern,
+                    "linkIndexPrefix" : settings.system.linkIndexPrefix,
+                    "repositories" : settings.general.analysisRepositories,
+                    // "analysisEnabled" : settings.general.spaceGenerator.analysisEnabled,
+                    // "seperator" : settings.general.spaceGenerator.seperator,
+                    // "enabledAnalysisTypes" : settings.general.enabledAnalysisTypes,
+                }
+            },
+            {
+                "robot" : "etlFramework/plugins/elasticsearch/target/Bulk.xill",
+                "threadCount" : 8,
+                "config" : { 
+                    "elasticsearch" : settings.general.elasticsearch,
+                    "indexField" : {"indexMapping":"%value%"},
+                    "bulkSize" : 25,
+                    "action" : "index"
+                }
+            },
+            {
+                "robot" : "etlFramework/plugins/console/target/Log.xill",
+                "threadCount" : 1,
+                "config" : {}
+            }
+        ];
+        
+        Concurrency.run(pipelineLinkAnalysis);
+        
+        System.print("Finished link analysis. Waiting 30 seconds for refresh to take place...", "INFO");
+        
+        System.wait(31000);
+    }
+}
+
+private function structureAnalysis(){
+    System.print("Start structure analysis.", "INFO");
+    
+    ElasticsearchHelpers->deleteIndex(settings.system.structureIndexPattern, settings.general.elasticsearch);
+    
+    var pipelineStructureAnalysis = [
+        {
+            "robot" : "analysis/StructureAnalysis.xill",
+            "threadCount" : 1,
+            "config" : {
+                "elasticsearch" : settings.general.elasticsearch,
+                "index" : settings.system.defaultIndexPattern,
+                "structureIndexPrefix" : settings.system.structureIndexPrefix,
+                "repositories" : settings.general.analysisRepositories,
+                // "analysisEnabled" : settings.general.spaceGenerator.analysisEnabled,
+                // "seperator" : settings.general.spaceGenerator.seperator,
+                "enabledAnalysisTypes" : settings.general.enabledAnalysisTypes,
+            }
+        },
+        {
+            "robot" : "etlFramework/plugins/elasticsearch/target/Bulk.xill",
+            "threadCount" : 8,
+            "config" : { 
+                "elasticsearch" : settings.general.elasticsearch,
+                "indexField" : {"indexMapping":"%value%"},
+                "bulkSize" : 25,
+                "action" : "index"
+            }
+        },
+        {
+            "robot" : "etlFramework/plugins/console/target/Log.xill",
+            "threadCount" : 1,
+            "config" : {}
+        }
+    ];
+    
+    Concurrency.run(pipelineStructureAnalysis);
+    
+    System.print("Finished structure analysis. Waiting 30 seconds for refresh to take place...", "INFO");
+    
+    System.wait(31000);
+}
+
+private function emptyContainerAnalysis(){
+
+    if(Collection.contains(settings.general.enabledAnalysisTypes, "emptycontainer") == true){
+        
+        System.print("Start empty container analysis.", "INFO");
+        
+        var pipelineEmptyContainer = [
+            {
+                "robot" : "analysis/EmptyContainer.xill",
+                "threadCount" : 1,
+                "config" : {
+                    "elasticsearch" : settings.general.elasticsearch,
+                    "index" : settings.system.defaultIndexPattern,
+                    "repositories" : settings.general.analysisRepositories
+                }
+            },
+            {
+                "robot" : "etlFramework/plugins/elasticsearch/target/Bulk.xill",
+                "threadCount" : 8,
+                "config" : { 
+                    "elasticsearch" : settings.general.elasticsearch,
+                    "bulkSize" : 25,
+                    "action" : "update",
+                    "upsert" : false,
+                    "indexField" : {"_index" : "%value%"}
+                }
+            },
+            {
+                "robot" : "etlFramework/plugins/console/target/Log.xill",
+                "threadCount" : 1,
+                "config" : {}
+            }
+        ];
+        
+        Concurrency.run(pipelineEmptyContainer);
+        
+        System.print("Finished Empty container analysis. Waiting 30 seconds for refresh to take place...", "INFO");
+        
+        System.wait(31000);
+    }
+}
+
+private function classificationAnalysis(){
+    
+    if(Collection.contains(settings.general.enabledAnalysisTypes, "classification") == true){
+        System.print("Start classification analysis.", "INFO");
+        
+        var pipelineClassification = [
+            {
+                "robot" : "analysis/Classification.xill",
+                "threadCount" : 1,
+                "config" : {
+                    "elasticsearch" : settings.general.elasticsearch,
+                    "index" : settings.system.defaultIndexPattern,
+                    "repositories" : settings.general.analysisRepositories,
+                    "classification" : settings.classification 
+                }
+            },
+            {
+                "robot" : "etlFramework/plugins/elasticsearch/target/Bulk.xill",
+                "threadCount" : 8,
+                "config" : { 
+                    "elasticsearch" : settings.general.elasticsearch,
+                    "bulkSize" : 25,
+                    "action" : "update",
+                    "upsert" : false,
+                    "indexField" : {"_index" : "%value%"}
+                }
+            },
+            {
+                "robot" : "etlFramework/plugins/console/target/Log.xill",
+                "threadCount" : 1,
+                "config" : {}
+            }
+        ];
+        
+        Concurrency.run(pipelineClassification);
+        
+        System.print("Finished classification analysis. Waiting 30 seconds for refresh to take place...", "INFO");
+        
+        System.wait(31000);
+    }
+}
+
+private function sameParentAnalysis(){
+    
+    if(Collection.contains(settings.general.enabledAnalysisTypes, "sameparent") == true){
+        System.print("Start duplicate with same parent analysis.", "INFO");
+        
+        var sameParentPipeline = [
+            {
+                "robot" : "analysis/DuplicateSameParent.xill",
+                "threadCount" : 1,
+                "config" : {
+                    "elasticsearch" : settings.general.elasticsearch,
+                    "index" : settings.system.defaultIndexPattern,
+                    "repositories" : settings.general.analysisRepositories
+                }
+            },
+            {
+                "robot" : "etlFramework/plugins/elasticsearch/target/Bulk.xill",
+                "threadCount" : 8,
+                "config" : { 
+                    "elasticsearch" : settings.general.elasticsearch,
+                    "bulkSize" : 25,
+                    "action" : "update",
+                    "upsert" : false,
+                    "indexField" : {"_index" : "%value%"}
+                }
+            },
+            {
+                "robot" : "etlFramework/plugins/console/target/Log.xill",
+                "threadCount" : 1,
+                "config" : {}
+            }
+        ];
+    
+        Concurrency.run(sameParentPipeline);
+        
+        System.print("Finished duplicate with same parent analysis. Waiting 30 seconds for refresh to take place...", "INFO");
+        
+        System.wait(31000);
+    }
+}
+
+private function duplicateAnalysis(){
+    
+    if(Collection.contains(settings.general.enabledAnalysisTypes, "duplicate") == true){
+        System.print("Start duplicate analysis.", "INFO");
+        
+        var sourcePipeline = [
+            {
+                "robot" : "analysis/Duplicate.xill",
+                "threadCount" : 1,
+                "config" : {
+                    "elasticsearch" : settings.general.elasticsearch,
+                    "index" : settings.system.defaultIndexPattern,
+                    //"analysisEnabled" : settings.general.spaceGenerator.analysisEnabled,
+                    //"seperator" : settings.general.spaceGenerator.seperator
+                }
+            },
+            {
+                "robot" : "etlFramework/plugins/elasticsearch/target/Bulk.xill",
+                "threadCount" : 8,
+                "config" : { 
+                    "elasticsearch" : settings.general.elasticsearch,
+                    "bulkSize" : 25,
+                    "action" : "update",
+                    "upsert" : false,
+                    "indexField" : {"_index" : "%value%"}
+                }
+            },
+            {
+                "robot" : "etlFramework/plugins/console/target/Log.xill",
+                "threadCount" : 1,
+                "config" : {}
+            }
+        ];
+        
+        Concurrency.run(sourcePipeline);
+        
+        System.print("Finished duplicate analysis. Please wait a moment for refreshing your dashboards or running another analysis.", "INFO");
+    }
+}
+
+private function translationAnalysis(){
+    
+    if(Collection.contains(settings.general.enabledAnalysisTypes, "translation") == true){
+        System.print("Start translation analysis.", "INFO");
+        
+        var sourcePipeline = [
+            {
+                "robot" : "analysis/Translation.xill",
+                "threadCount" : 1,
+                "config" : {
+                    "elasticsearch" : settings.general.elasticsearch,
+                    "index" : settings.system.defaultIndexPattern
+                }
+            },
+            {
+                "robot" : "etlFramework/plugins/elasticsearch/target/Bulk.xill",
+                "threadCount" : 8,
+                "config" : { 
+                    "elasticsearch" : settings.general.elasticsearch,
+                    "bulkSize" : 25,
+                    "action" : "update",
+                    "upsert" : false,
+                    "indexField" : {"_index" : "%value%"}
+                }
+            },
+            {
+                "robot" : "etlFramework/plugins/console/target/Log.xill",
+                "threadCount" : 1,
+                "config" : {}
+            }
+        ];
+        
+        Concurrency.run(sourcePipeline);
+        
+        System.print("Finished translation analysis. Please wait a moment for refreshing your dashboards or running another analysis.", "INFO");
+    }
+}

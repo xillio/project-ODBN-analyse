@@ -1,0 +1,40 @@
+use System, File, Collection, String;
+
+function move(sourcePath, targetPath, replace){
+    sourcePath = normalizePath(sourcePath);
+    targetPath = normalizePath(targetPath);
+    
+    var targetDirectory = getParentPath(targetPath);
+    if(!File.exists(targetDirectory)){
+        File.createFolder(targetDirectory);
+    }
+    
+    File.move(sourcePath, targetPath, replace);
+}
+
+private function normalizePath(path){
+    return String.replace(path,"\\","/", false, true, 0);
+}
+
+private function getParentPath(path){
+    var paths = [];
+    
+    var pathsTemp = String.split(path, "/");
+    var prevPath = "";
+    foreach(p in pathsTemp){
+        if(prevPath != ""){
+            prevPath ::= "/";
+        }
+        paths[] = prevPath :: p;
+        prevPath = prevPath :: p;
+    }
+    
+    if(Collection.length(paths) > 1){
+        Collection.remove(paths, Collection.length(paths)-1);
+    }
+    else
+    {
+        paths = [null];    
+    }
+    return paths[Collection.length(paths) - 1];
+}

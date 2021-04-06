@@ -1,0 +1,81 @@
+use Concurrency, System, Mongo, Collection, XURL, Date;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+argument data = Concurrency.testInput({}, []);
+
+var query = {
+    "size" : 1000,
+    "query" : {
+        "bool": {
+          "filter": [
+               {
+                   "term" : {
+                       "reversedVersionOrder" : 1
+                   }
+               },
+               {
+                 "terms" : {
+                   "source" : data.repositories
+                 }
+               }
+          ]
+        }
+    }
+};
+
+var processing = true;
+
+var counter = 0;
+
+var files = ElasticsearchHelpers->search(data.index, query, true, "30m", data.elasticsearch);
+
+while(processing){
+    
+    if(Collection.length(files.body.hits.hits) == 0){
+        processing = false;
+    }
+        
+    foreach(hit in files.body.hits.hits){
+        
+        if(counter % 1000 == 0)
+        {
+            Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed object(s): " :: counter}, data.output);
+        }
+    
+        var classificationQuery = {
+            "query" : {
+                "percolate" : {
+                    "field" : "analyticsClassificationQuery",
+                    "document" : hit._source 
+                }
+            }
+        };
+        
+        var classificationResults = ElasticsearchHelpers->search("insightssystem_classification", classificationQuery, data.elasticsearch);
+        
+        var analyticsClassificationObject = {};
+        
+        // set empty values
+        
+        foreach(type, config in data.classification){
+            analyticsClassificationObject[type] = null;
+        }
+        
+        foreach (result in classificationResults.body.hits.hits)
+        {
+            if(analyticsClassificationObject[result._source.analyticsClassificationType] == null){
+                analyticsClassificationObject[result._source.analyticsClassificationType] = [];
+            }
+            analyticsClassificationObject[result._source.analyticsClassificationType][] = result._source.analyticsClassificationResult;
+        }
+        
+        var hitUpdateObject = {"_id":hit._id, "_index":hit._index, "analyticsClassification":analyticsClassificationObject};
+        Concurrency.push(hitUpdateObject, data.output);
+        counter++;
+    }
+        
+    files = ElasticsearchHelpers->scroll(files.body._scroll_id, "30m", data.elasticsearch);
+}
+
+ElasticsearchHelpers->deleteScroll(files.body._scroll_id, data.elasticsearch);

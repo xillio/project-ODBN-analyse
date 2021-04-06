@@ -1,0 +1,113 @@
+// Description: writes json files (containing an array of objects)
+// Config usage:
+// {
+//      "path" : specifies the path of the directory to store the json files
+//      "contentLimit" : limits the amount of objects a json file contains
+//      "fileLimit" : limits the amount of files per directory
+//      (optional) "sourceField" : {"path":{"toValue":"%value%"}}, specifies the part of the object to index
+// }
+
+
+use Concurrency, System, Stream, File, Collection, String, Date, Assert;
+
+include etlFramework.plugins.json.Helper as JsonHelpers;
+
+argument data = Concurrency.testInput({}, []);
+
+var fileCounter = 0;
+var folderCounter = 0;
+var totalCounter = 0;
+
+var jsonFile;
+
+var contentCounter = 0;
+
+//This creates the first file so that it can be written to.
+jsonFile = File.openWrite(data.path :: "/" :: addZeroes(folderCounter,6) :: "/" :: addZeroes(fileCounter,6) :: ".json");
+Stream.write("[", jsonFile);
+
+var object = Concurrency.pop(data.input);
+
+while(object != null){
+    if(object.xillioType == "log"){
+        Concurrency.push(object, data.output);
+    }
+    else
+    {
+        execute(object, data, false);
+    }
+    
+    object = Concurrency.pop(data.input);
+}
+
+Stream.write("]", jsonFile);
+fileCounter++;
+      
+function execute(object, data, assert)
+{
+   do
+   {
+        //If there are X entities in a jsonFile a new file will be created.
+        if(contentCounter >= data.contentLimit){
+            Stream.write("]", jsonFile);
+            fileCounter++;
+            
+            //If there are more than 99999 files in a folder a new folder will be targeted.
+            if(fileCounter >= data.fileLimit){
+                fileCounter=0;
+                folderCounter++;
+            }
+        
+        
+            contentCounter = 0;
+            jsonFile = File.openWrite(data.path :: "/" :: addZeroes(folderCounter,6) :: "/" :: addZeroes(fileCounter,6) :: ".json");
+            Stream.write("[", jsonFile);
+        }
+        
+        
+        if(data.sourceField != null){
+            object = {"path" : JsonHelpers->getFieldValue(object, data.sourceField)};
+        }
+        
+        var json = object;
+        
+        if(contentCounter == 0){
+            Stream.write(System.toJSON(json) :: "\n", jsonFile);
+        }
+        else{
+            Stream.write("," :: System.toJSON(json) :: "\n", jsonFile);
+        }
+        
+                        
+        if(totalCounter % 10000 == 0) {
+            Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed file/folder" :: fileCounter :: "/" :: folderCounter}, data.output);
+        }
+        
+        contentCounter++;
+        totalCounter++;
+
+   }
+   fail(e)
+   {
+       
+       
+       // Checks the assert value for true or false. When extending the functionality of the function, set to true so you can implement your own error handeling.
+       if(assert){
+           Assert.error(e.message);
+       }
+       else
+       {
+           Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+       }
+   }
+   
+}      
+            
+private function addZeroes(value, length){
+    while(String.length(value)< length){
+        value = "0" :: value;
+    }
+    
+    return value;
+}
+

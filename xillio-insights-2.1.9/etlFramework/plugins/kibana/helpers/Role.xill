@@ -1,0 +1,22 @@
+use XURL, String,  Assert;
+
+include etlFramework.plugins.kibana.Helper as KibanaHelpers;
+
+function createRole(name, elasticsearchRoleConfig, kibanaRoleConfig, kibana, kibanaVersion) {
+    var options = KibanaHelpers->getConnectionOptions(kibana);
+    options.headers["kbn-xsrf"] = kibanaVersion;
+    
+    var configuration = {
+      "elasticsearch" : elasticsearchRoleConfig,
+      "kibana" : kibanaRoleConfig
+    };
+    var result = XURL.put(kibana.host :: "/api/security/role/" :: name, configuration, options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        Assert.error("Kibana error! " :: result.body.error);
+    }
+    else
+    {
+        return result;
+    }
+}

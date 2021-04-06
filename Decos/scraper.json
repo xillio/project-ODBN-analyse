@@ -1,0 +1,41 @@
+
+{
+  "modules": {
+    "getFiles": {
+      "type": "filescraper",
+      "rootDir": "C:/Users/MyUser/",
+      "zoneId": "UTC",
+      "dateTimePattern": "yyyy-MM-dd'T'HH:mm:ss.SSSX",
+      "filesTo": [
+        "metadataEnhancer"
+      ],
+      "foldersTo": [
+        "folders"
+      ],
+      "excludePaths" : [
+        "./Images",
+        "./Documents/Private Documents"
+      ],   
+      "includePaths" : [
+        "./Documents",
+        "./Downloads"
+      ]  
+    },
+    "metadataEnhancer": {
+      "type": "metadata",
+      "perCore": true,
+      "concurrency": 1,
+      "outputTo": [
+        "files"
+      ]
+    },
+    "files": {
+      "type": "jsonlineWriter",
+      "filePrefix": "files"
+    },
+    "folders": {
+      "type": "jsonlineWriter",
+      "filePrefix": "folders"
+    }
+  }
+}

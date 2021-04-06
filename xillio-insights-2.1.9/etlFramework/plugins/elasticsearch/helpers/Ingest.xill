@@ -1,0 +1,42 @@
+use XURL, String;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+function createPipeline(id, configuration, elasticsearch){
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+    var createdPipeline = XURL.put(elasticsearch.host :: "/_ingest/pipeline/" :: id, configuration, options);
+    
+    if(String.startsWith(createdPipeline.status.code, "2") != true){
+        Assert.error("Elasticsearch error! " :: createdPipeline.body.error);
+    }
+    else
+    {
+        return createdPipeline;
+    }
+    
+}
+
+function deletePipeline(id, elasticsearch){
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+    var deletedPipeline = XURL.delete(elasticsearch.host :: "/_ingest/pipeline/" :: id, options);
+    
+    if(String.startsWith(deletedPipeline.status.code, "2") != true){
+        Assert.error("Elasticsearch error! " :: deletedPipeline.body.error);
+    }
+    else
+    {
+        return deletedPipeline;
+    }
+}
+
+function pipelineExsists(id, elasticsearch){
+    var options = ElasticsearchHelpers->getConnectionOptions(elasticsearch);
+    var pipelineExists = XURL.get(elasticsearch.host :: "/_ingest/pipeline/" :: id, options);
+    if(pipelineExists.status.code == 200)
+    {
+        return true;
+    }
+    else{
+        return false;
+    }
+}

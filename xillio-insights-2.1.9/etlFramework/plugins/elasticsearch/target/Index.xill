@@ -1,0 +1,59 @@
+// Description: executes index actions on the Elasticsearch index API
+// Config usage:
+// {
+//      "elasticsearch" : object containing the elasticsearch settings {host" : "http://localhost:9200", "username" : "", "password" : "", "authenticationEnabled" : false}
+//      "index" : he name of the index to use
+//      (optional) "idField" : {"path":{"toValue":"%value%"}}, specifies the field to use as an id else auto id is used
+//      (optional) "sourceField" : {"path":{"toValue":"%value%"}}, specifies the part of the object to index
+// }
+
+use Concurrency, System, Mongo, Collection, XURL, Date;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+argument data = Concurrency.testInput({}, []);
+
+var object = Concurrency.pop(data.input);
+
+while(object != null){
+    if(object.xillioType == "log"){
+            Concurrency.push(object, data.output);
+    }
+    else
+    {
+        execute(object, data, false);
+    }
+   
+    object = Concurrency.pop(data.input);
+}
+
+function execute(object, data, assert)
+{
+   do
+   {
+        var _id = null;
+        if(data.idField != null){
+             var _id = ElasticsearchHelpers->getFieldValue(object, data.idField);
+        }
+        
+		if(data.sourceField != null){
+			object = ElasticsearchHelpers->getFieldValue(object, data.sourceField);
+		}
+		
+        ElasticsearchHelpers->index(object, _id, data.index, data.elasticsearch);
+   }
+   fail(e)
+   {
+       
+       
+       // Checks the assert value for true or false. When extending the functionality of the function, set to true so you can implement your own error handeling.
+       if(assert){
+           Assert.error(e.message);
+       }
+       else
+       {
+           Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+       }
+   }
+   
+}

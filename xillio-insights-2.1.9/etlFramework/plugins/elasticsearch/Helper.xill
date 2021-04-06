@@ -1,0 +1,16 @@
+include etlFramework.plugins.elasticsearch.helpers.Connection;
+include etlFramework.plugins.elasticsearch.helpers.IndexManagement;
+include etlFramework.plugins.elasticsearch.helpers.Index;
+include etlFramework.plugins.elasticsearch.helpers.Bulk;
+include etlFramework.plugins.elasticsearch.helpers.DataFrames;
+include etlFramework.plugins.elasticsearch.helpers.Search;
+include etlFramework.plugins.elasticsearch.helpers.Update;
+include etlFramework.plugins.elasticsearch.helpers.UpdateByQuery;
+include etlFramework.plugins.elasticsearch.helpers.DeleteByQuery;
+include etlFramework.plugins.elasticsearch.helpers.ObjectManagement;
+include etlFramework.plugins.elasticsearch.helpers.Template;
+include etlFramework.plugins.elasticsearch.helpers.Scroll;
+include etlFramework.plugins.elasticsearch.helpers.Ingest;
+include etlFramework.plugins.elasticsearch.helpers.ReIndex;
+include etlFramework.plugins.elasticsearch.helpers.Delete;
+include etlFramework.plugins.elasticsearch.helpers.Task;

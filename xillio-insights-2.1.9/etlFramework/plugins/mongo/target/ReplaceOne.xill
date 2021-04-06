@@ -1,0 +1,59 @@
+// Description: insert documents into a Mongo DB
+// Config usage:
+// {
+//      "elasticsearch" : object containing the Mongo settings {"name" : "insights_default", "host" : "localhost", "port" : 27017, "username" : null, "password" : null}
+//      "collection" : "documents",
+//      (optional) "sourceField" : {"path":{"toValue":"%value%"}}, specifies the part of the object to insert
+// }
+
+use Concurrency, System, Mongo, Collection, Date, Assert;
+
+include etlFramework.plugins.mongo.Helper as MongoHelpers;
+
+argument data = Concurrency.testInput({}, []);
+
+var object = Concurrency.pop(data.input);
+
+while(object != null){
+    if(object.xillioType == "log"){
+        Concurrency.push(object, data.output);
+    }
+    else
+    {
+        execute(object, data, false);
+    }
+    
+    object = Concurrency.pop(data.input);
+}
+
+function execute(object, data, assert)
+{
+   do
+   {
+        var query = object.query;
+        
+        if(data.sourceField != null){
+            object = MongoHelpers->getFieldValue(object, data.sourceField);
+        }
+        else
+        {
+            object = MongoHelpers->getFieldValue(object, {"object":"%value%"});
+        }
+        
+        MongoHelpers->replaceOne(object, data.collection, query, data.upsert, data.mongo);
+   }
+   fail(e)
+   {
+       
+       
+       // Checks the assert value for true or false. When extending the functionality of the function, set to true so you can implement your own error handeling.
+       if(assert){
+           Assert.error(e.message);
+       }
+       else
+       {
+           Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+       }
+   }
+   
+}

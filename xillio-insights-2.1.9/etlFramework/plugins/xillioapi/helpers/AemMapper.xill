@@ -1,0 +1,73 @@
+use String, Encode, Collection, Concurrency, System;
+
+include etlFramework.plugins.xillioapi.Helper as XillioApiHelpers;
+
+function parseAemDocument(object, data){
+    
+    // only Folders, Pages and Assets are supported
+    if(object.kind != "Folder" && object.kind != "Page" && object.kind != "Asset"){
+        return null;
+    }
+    
+    var formatted = {};
+    
+    formatted._id = object.id;
+    formatted.id = object.id;
+    
+    formatted.reversedVersionOrder = 1; // fixed value, versions not supported in the API
+    formatted.versionCount = 1; // fixed value, versions not supported in the API
+    
+    
+    if(object.kind == "Folder"){
+        formatted.type = "Container";
+    }
+    else
+    {
+        formatted.type = "Document";
+    }
+    
+    formatted.subType = object.kind;
+    
+    formatted.isFile = false; 
+    if(object.original.file != null){
+        formatted.isFile = true; 
+        formatted.binaryExtension = object.original.file.rawExtension;
+        formatted.binaryByteSize = object.original.file.size;
+        formatted.binaryHash = object.original.hash.sha1;
+    }
+    
+    formatted.source = data.source;
+    formatted.name = object.original.name.displayName;
+    formatted.nameSystem = object.original.systemName;
+    
+    formatted.state = []; // checken of pusblished beschikbaar is oid
+    
+    formatted.hierarchy = object.original.fileSystem.path;
+    
+    if(formatted.subType == "Page"){
+          formatted.url = data.siteUrl :: formatted.hierarchy :: ".html";
+    }
+    
+    formatted.parent = XillioApiHelpers->getParentFromHierarchy(formatted.hierarchy);
+    formatted.dateCreated = object.original.created.date;
+    formatted.principalCreated = object.original.created.by.displayName;
+    
+    if(object.original.modified != null){
+        formatted.dateModified = object.original.modified.date;
+        if(object.original.modified.by != null){
+            formatted.prinicipalModified = object.original.modified.by.displayName;
+        }
+    }
+    
+    if(object.original.language != null){
+        formatted.language = object.original.language.tag;
+    }
+    else
+    {
+        object.original.language = null;
+    }
+    
+    formatted.isOriginalLanguage = true; // translations are not supported in the API
+    
+    return formatted;   
+}

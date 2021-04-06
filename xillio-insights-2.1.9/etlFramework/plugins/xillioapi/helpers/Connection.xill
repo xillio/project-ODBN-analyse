@@ -1,0 +1,15 @@
+use Assert, XURL, String, Date;
+
+function getToken(host, clientId, clientSecret, username, password){
+    var body = "grant_type=password&username=" :: username :: "&password=" :: password;
+    var result = XURL.post(host :: "/oauth/token", body, {"headers":{"Content-Type":"application/x-www-form-urlencoded"}, "basicAuth" : {"username":clientId, "password":clientSecret}});
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        Assert.error("Xillio API error! " :: result.body.message);
+    }
+    else
+    {
+        result.body.tokenTime = Date.now();
+        return result.body;
+    }
+}

@@ -1,0 +1,162 @@
+// Description: executes bulk actions on the Elasticsearch bulk API
+// Config usage:
+// {
+//      "elasticsearch" : object containing the elasticsearch settings {host" : "http://localhost:9200", "username" : "", "password" : "", "authenticationEnabled" : false}
+//      "bulkSize" : specifies the size of the bulk message in terms of objects
+//      "index" : the name of the index to use
+//      "indexField" : {"path":{"toValue":"%value%"}}, specifies the field to use for the index name, this overrules the index setting
+//      "indexPrefix" : "insights_default_", // specifies the prefix added to the index name 
+//      "indexSuffix" : "test", // specifies the prefix added to the end of the index name 
+//      "action" : index or update
+//      "indexMaping" : // index mapping object, containing the `mappings`, `field` that is used to get the source value and the `type` to specify the type of logic is applied for mapping
+//      (optional) "upsert" : true or false, can be used in combination with the update action
+//      "actionField" :pecifies the field to use for the action to apply to the object, should contain index or update, this overrules the action setting
+//      (optional) "sourceField" : {"path":{"toValue":"%value%"}} specifies the part of the object to index,
+// }
+// currently the bulk function only supports auto id
+
+use Concurrency, System, Mongo, Collection, XURL, Date, Assert, String;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+argument data = Concurrency.testInput({},[]);
+
+var bulkSize = 0;
+var body = "";
+
+var object = Concurrency.pop(data.input);
+
+while(object != null){
+    if(object.xillioType == "log"){
+            Concurrency.push(object, data.output);
+    }
+    else
+    {
+        execute(object, data, false);
+    }
+   
+    object = Concurrency.pop(data.input);
+}
+
+if(bulkSize > 0){
+    do 
+    {
+        ElasticsearchHelpers->bulk(body, data.index, data.elasticsearch);
+    }
+    fail(e){
+        Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+    }
+}
+
+
+function execute(object, data, assert)
+{
+   do
+   {
+        var prefix = initPrefixSuffix(data.indexPrefix);
+        var suffix = initPrefixSuffix(data.indexSuffix);
+        
+        // check for idex per object
+        
+        if(data.indexMapping != null){
+            processIndexMapping(ElasticsearchHelpers->getFieldValue(object, data.indexMapping.field), data.indexMapping.type, prefix, suffix, data.indexMapping.mappings);
+        }
+        else if(data.indexField != null){
+            data.index = prefix :: ElasticsearchHelpers->getFieldValue(object, data.indexField) :: suffix;
+        }
+        
+        
+        
+        // check for action per object
+        if(data.actionField != null){
+            data.action = ElasticsearchHelpers->getFieldValue(object, data.actionField);
+        }
+        
+        if(data.sourceField != null){
+            object = ElasticsearchHelpers->getFieldValue(object, data.sourceField);
+        }
+        
+        body ::= applyAction(object);
+        bulkSize++;
+        
+        if(bulkSize > data.bulkSize){
+            ElasticsearchHelpers->bulk(body, data.index, data.elasticsearch);
+            body = "";
+            bulkSize = 0;
+        }
+   }
+   fail(e)
+   {
+       
+       Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+       
+       // Checks the assert value for true or false. When extending the functionality of the function, set to false so you can implement your own error handeling.
+       if(assert){
+           Assert.error(e.message);
+       }
+   }
+   
+}
+
+
+private function initPrefixSuffix(prefixSuffix){
+    if(prefixSuffix != null){
+        return prefixSuffix;
+    }
+    else
+    {
+        return "";    
+    }
+}
+
+
+private function applyAction(object){
+            
+    if(data.action == "update"){
+         var _id = object._id;
+         Collection.remove(object, "_id");
+         Collection.remove(object, "_index");
+         
+         var result = "{\"" :: data.action :: "\":{\"_id\": \"" :: _id ::"\", \"_index\": \"" :: data.index ::"\"}}\r\n";
+         result ::= "{\"doc\" : " :: System.toJSON(object) :: ", \"doc_as_upsert\" :" :: data.upsert ::  "}\r\n";
+         return result;
+    }
+    else
+    {
+        var result = "{\"" :: data.action :: "\":{\"_index\": \"" :: data.index ::"\"}}\r\n";
+        result ::= System.toJSON(object, false) :: "\r\n";
+        return result;
+    }
+}
+
+private function processIndexMapping(value, type, prefix, suffix, mappings){
+    foreach(index, mapping in mappings){
+        foreach(mapValue in mapping){
+            if(type == "equals"){
+                if(value == mapValue){
+                   data.index = prefix :: index :: suffix;
+                }
+            }
+            else if(type == "startsWith"){
+                if(String.startsWith(value, mapValue)){
+                   data.index = prefix :: index :: suffix;
+                }
+            }
+            else if(type == "endsWith"){
+                if(String.endsWith(value, mapValue)){
+                    data.index = prefix :: index :: suffix;
+                }
+            }
+            else if(type == "contains"){
+                if(String.contains(value, mapValue)){
+                    data.index = prefix :: index :: suffix;
+                }
+            }
+            else if(type == "matches"){
+                if(String.matches(value, mapValue)){
+                    data.index = prefix :: index :: suffix;
+                }
+            }
+        }
+    }
+}

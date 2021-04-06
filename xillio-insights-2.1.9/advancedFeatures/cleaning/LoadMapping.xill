@@ -1,0 +1,42 @@
+use System, Excel, Stream, File, Concurrency;
+
+include etlFramework.Settings as Settings;
+
+var settings = Settings->getSettings();
+
+var pathToMappingSheet = "f:/folders.csv";
+
+var pipeline = [
+    {
+        "robot" : "etlFramework/plugins/csv/source/Read.xill",
+        "config" : {
+            "path" : pathToMappingSheet,
+            // start as delimiter because this ensures that the charachter is not part of the path
+            "delimiter" : "\\*"
+        },
+        "threadCount" : 1 // do not change
+    },
+    {
+        "robot" : "advancedFeatures/cleaning/lib/MappingTransform.xill",
+        "config" : {},
+        "threadCount" : settings.system.threadCount
+    },
+    {
+            "robot" : "etlFramework/plugins/elasticsearch/target/UpdateByQuery.xill",
+            "threadCount" : 1, // do not change
+            "config" : {
+                "elasticsearch" : settings.general.elasticsearch,
+                "index" : settings.system.defaultIndexPattern,
+                "urlParams" : "?refresh"
+            }
+        },
+    {
+        "robot" : "etlFramework/plugins/console/target/Log.xill",
+        "config" : {
+            "path" : ""
+        },
+        "threadCount" : 1 // do not change
+    }
+];
+
+Concurrency.run(pipeline);

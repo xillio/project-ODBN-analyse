@@ -1,0 +1,48 @@
+// Description: reads json files from an directory (containing an array of objects) and adds the objects to the queue
+// Config usage:
+// {
+//      (optional) "hasHeader" : specifies if headers are written to the csv file, defaults to true
+//      (optional) "hasEnclosure" : specifies if fields should be double qouted, defaults to false
+//      (optional) "delimiter" : the delimiter to use, defaults to ;
+//      "path" : // specifies the path of the directory containing the csv file
+// }
+
+use Concurrency, System, File, Stream, Date;
+
+include etlFramework.plugins.csv.Helper as CsvHelpers;
+
+argument data = Concurrency.testInput({"path":"f:/Book2.csv"}, []);
+
+init();
+
+do {
+    var csvFile = File.openRead(data.path);
+    
+    var header = CsvHelpers->iterate(csvFile, true, [], data.delimiter, data.hasEnclosure);
+    
+    var object = CsvHelpers->iterate(csvFile, false, header, data.delimiter, data.hasEnclosure);
+    
+    while(object){
+        Concurrency.push(object, data.output);
+        object = CsvHelpers->iterate(csvFile, false, header, data.delimiter, data.hasEnclosure);
+    }
+        
+}
+fail(e){
+    Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":null}, data.output);
+}
+
+function init(){
+    
+    if(data.hasEnclosure == null){
+        data.hasEnclosure = false;
+    }
+    
+    if(data.delimiter == null){
+        data.delimiter = ",";
+    }
+    
+    if(data.hasHeader == null){
+        data.hasHeader = true;
+    }
+}

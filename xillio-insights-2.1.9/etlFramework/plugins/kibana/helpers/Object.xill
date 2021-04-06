@@ -1,0 +1,66 @@
+use XURL, String,  Assert;
+
+include etlFramework.plugins.kibana.Helper as KibanaHelpers;
+
+function getObject(id, type, kibana){
+    var options = KibanaHelpers->getConnectionOptions(kibana);
+    var object = XURL.get(kibana.host :: "/api/saved_objects/" :: type :: "/" :: id, options);
+    
+    if(String.startsWith(object.status.code, "2") != true){
+        Assert.error("Kibana error! " :: object.body.error);
+    }
+    else
+    {
+        return object;
+    }
+    
+}
+
+function updateObject(id, type, configuration, kibana, kibanaVersion){
+    return updateObject(id, null, type, configuration, kibana, kibanaVersion);
+}
+
+function updateObject(id, spaceId, type, configuration, kibana, kibanaVersion){
+    var options = KibanaHelpers->getConnectionOptions(kibana);
+    options.headers["kbn-xsrf"] = kibanaVersion;
+    
+    var url = kibana.host :: "/api/saved_objects/" :: type :: "/" :: id;
+    
+    if(spaceId != null){
+        url = kibana.host :: "/s/" :: spaceId :: "/api/saved_objects/" :: type :: "/" :: id;
+    }
+    
+    var result = XURL.put(url, configuration, options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        Assert.error("Kibana error! " :: result.body.error);
+    }
+    else
+    {
+        return result;
+    }
+}
+
+function findObjects(urlParams, kibana){
+    return findObjects(urlParams, null, kibana);
+}
+
+function findObjects(urlParams, spaceId, kibana){
+    var options = KibanaHelpers->getConnectionOptions(kibana);
+    
+    var url = kibana.host :: "/api/saved_objects/_find" :: urlParams;
+    
+    if(spaceId != null){
+        url = kibana.host :: "/s/" :: spaceId :: "/api/saved_objects/_find" :: urlParams;
+    }
+    
+    var result = XURL.get(url, options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        Assert.error("Kibana error! " :: result.body.error);
+    }
+    else
+    {
+        return result;
+    }
+}

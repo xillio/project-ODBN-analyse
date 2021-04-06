@@ -1,0 +1,381 @@
+// Description: function to Extract Office 365 using the graph API
+// Config usage:
+// {
+//        "clientId" : "",
+//        "clientSecret" : "",
+//        "tentantId": "",
+//        (optinal) "keyword" : keyword for filtering sites
+//        (optional) "type":  users if null then is sites
+//        (optional) "hashing" : object containg hashing settings"hashing" : {"enabled" : false}
+//        "source" : name of the source, for example livelink,
+//        "toUdm" : specififies whenether to format the object to the udm
+// }
+
+use XURL, System, File, Stream, Concurrency, Date, String, Collection, Encode;
+
+include etlFramework.plugins.graph.Helper as GraphHelpers;
+
+argument data = Concurrency.testInput({}, []);
+
+var token;
+
+init();
+
+var counter = 0;
+
+crawl();
+
+function crawl(){
+
+    if(data.type == "users")
+    {
+        // crawl user OneDrives
+        crawlDrives(data.type, data.baseUrl, tokenIsValid());
+    }
+    else
+    {
+        // crawlSites (sites, subSites and documentLibraries)
+        var siteObjects = GraphHelpers->searchSites("?search=" :: Encode.toPercent(data.keyword), data.baseUrl, tokenIsValid(), 0);
+        var processing = true;
+        
+        while(processing){
+        
+            foreach(siteObject in siteObjects.value){
+                siteObject.driveType = "Site";
+                var parsedSiteObject = toUdm(siteObject);
+                push(parsedSiteObject);
+                
+                crawlSite(data.baseUrl :: "sites/" :: siteObject.id, token);    
+            }
+            
+            if(siteObjects == null || siteObjects["@odata.nextLink"] == null){
+                processing = false;
+            }
+            else
+            {
+                siteObjects = GraphHelpers->fetchNext(siteObjects["@odata.nextLink"], tokenIsValid(), 0);
+            }
+            
+        }
+        
+    }
+    
+}
+
+private function crawlDrives(type, connectionUrl, token){
+    
+    var objects = GraphHelpers->getByType(type, connectionUrl, tokenIsValid(), 0);
+    var processing = true;
+    
+    while(processing){
+        foreach(object in objects.value){
+            do{
+               
+                var driveObjects = GraphHelpers->getByType("drives", connectionUrl :: type ::"/" :: object.id, tokenIsValid(), 0);
+                var driveProcessing = true;
+                
+                while(driveProcessing){
+                    if(driveObjects != null){
+                        foreach(driveObject in driveObjects.value) {
+                            var parsedDriveObject = toUdm(driveObject);
+                            push(parsedDriveObject);
+                            
+                            getDriveItems(connectionUrl :: type :: "/" :: object.id, driveObject, "root");
+                        }  
+                    }
+                    
+                    if(driveObjects == null || driveObjects["@odata.nextLink"] == null){
+                        driveProcessing = false;
+                    }
+                    else
+                    {
+                        driveObjects = GraphHelpers->fetchNext(driveObjects["@odata.nextLink"], tokenIsValid(), 0);
+                    }
+                }
+            }
+            fail(e)
+            {   
+                if (String.startsWith(e.message, " Service")) {
+                    Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"warning","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+                } else {
+                    Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+                }        
+            }
+        }
+        
+        if(objects == null || objects["@odata.nextLink"] == null){
+            processing = false;
+        }
+        else
+        {
+            objects = GraphHelpers->fetchNext(objects["@odata.nextLink"], tokenIsValid(), 0);
+        }
+    }
+
+}
+
+private function crawlSite(connectionUrl, token) {
+    do {
+        var driveObjects = GraphHelpers->getByType("drives",connectionUrl, tokenIsValid(), 0);
+        var driveProcessing = true;
+        
+        while(driveProcessing){
+            foreach(driveObject in driveObjects.value) {
+                var parsedDriveObject = toUdm(driveObject);
+                push(parsedDriveObject);
+                getDriveItems(connectionUrl, driveObject, "root");
+            }    
+            
+            if(driveObjects == null || driveObjects["@odata.nextLink"] == null){
+                driveProcessing = false;
+            }
+            else
+            {
+                driveObjects = GraphHelpers->fetchNext(driveObjects["@odata.nextLink"], tokenIsValid(), 0);
+            }
+        }
+    
+    }
+    fail(e)
+    {
+        if (String.startsWith(e.message, " Service")) {
+            Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"warning","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":connectionUrl}, data.output);
+        } else {
+            Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":connectionUrl}, data.output);
+        }  
+    }
+    
+}
+
+// // Recursively get all the driveItems
+private function getDriveItems(connectionUrl, drive, itemId) {
+    do {
+        var childrenObjects = GraphHelpers->getDriveItemChildren(drive.id, itemId, connectionUrl, tokenIsValid(), 0);
+        var processing = true;
+        
+        while(processing){
+            foreach(childObject in childrenObjects.value){
+                childObject.baseUrl = drive.webUrl;
+                var parsedObject = toUdm(childObject);
+                push(parsedObject);
+                if(childObject.file) {
+                    
+                } else {
+                    getDriveItems(connectionUrl, drive, childObject.id);
+                }
+            }
+            if(childrenObjects == null || childrenObjects["@odata.nextLink"] == null){
+                processing = false;
+            }
+            else
+            {
+                childrenObjects = GraphHelpers->fetchNext(childrenObjects["@odata.nextLink"], tokenIsValid(), 0);
+            }
+        }
+    }
+    fail(e){
+        if (String.startsWith(e.message, " Service")) {
+            Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"warning","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":{"drive": drive, "itemId": itemId}}, data.output);
+        } else {
+            Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":{"drive": drive, "itemId": itemId}}, data.output);
+        }  
+    }
+}
+
+private function toUdm(object){
+    
+    object.index = data.index;
+    object.source = data.source;
+    
+    var udm = parseDocument(object);
+    
+    object = GraphHelpers->setFieldValue(object, GraphHelpers->prepareField({"udm":"%value%"}, udm)); 
+    
+    return object;
+}
+
+private function parseDocument(object){
+
+    // calculating hierarchy
+    // the webUrl cannot be used for all files because for Office documents a special Url is provided
+    // therefor the path is calculated based on the parent
+    if(object.baseUrl != null){
+        var parentReference = String.split(object.parentReference.path, "/", false);
+        if(Collection.length(parentReference) == 3)
+        {
+            object.path = object.baseUrl :: "/" :: object.name;
+        }
+        else
+        {
+            Collection.remove(parentReference, 0);
+            Collection.remove(parentReference, 0);
+            Collection.remove(parentReference, 0);
+            object.path = object.baseUrl :: "/" :: String.join(parentReference, "/") :: "/" :: Encode.toPercent(object.name);
+        }
+    }
+    else
+    {
+        object.path = normalizePath(object.webUrl);
+    }
+    
+    var formatted = {};
+    
+    formatted._id = object.id;
+    formatted.id = object.id;
+    formatted.reversedVersionOrder = 1;
+    formatted.versionCount = 1;
+    
+    formatted.isFile = false;
+    
+    if(object.file != null){
+        formatted.type = "Document";
+        formatted.subType = "File";
+        formatted.isFile = true;
+    }
+    else if(object.folder != null)
+    {
+        formatted.type = "Container";
+        formatted.subType = "Folder";
+    }
+    else if(object.driveType != null)
+    {
+        formatted.type = "Container";
+        if(object.driveType == "business") {object.driveType = "OneDrive";}
+        formatted.subType = object.driveType;
+    }
+    else if(object.package != null)
+    {
+        formatted.type = "Document";
+        formatted.subType = object.package.type;
+    }
+    else
+    {
+        Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"warning","xillioRobot":System.info().robotUrl,"xillioMessage": "Content type not supported!", "xillioObject":object}, data.output);   
+    }
+    
+    formatted.source = data.source;
+    formatted.name = object.name;
+    
+    if(object.description != null){
+        formatted.description = object.description;
+    }
+    
+    formatted.state = [];
+    
+    if(object.createdBy != null){
+        foreach(type, value in object.createdBy){
+            formatted.principalCreated = value.displayName :: " (" :: type :: ")";    
+        }
+    }
+    
+    if(object.lastModifiedBy != null) {
+        foreach(type, value in object.lastModifiedBy){
+            formatted.principalModified = value.displayName :: " (" :: type :: ")";    
+        }
+    }
+    
+    formatted.hierarchy = object.path;
+    formatted.parent = getParentFromHierarchy(formatted.hierarchy);
+    
+    formatted.dateCreated = object.createdDateTime;
+    formatted.dateModified = object.lastModifiedDateTime;
+    
+    if(object.file != null){
+        formatted.name = pathToName(object.name);
+        formatted.binaryExtension = pathToExtension("/" :: object.name);
+        formatted.binaryByteSize = object.size;
+        formatted.binaryByteSizeAsNumber = object.size;
+        if(data.hashing.enabled == false){
+            if(object.file.hashes != null && object.file.hashes.quickXorHash != null){
+                formatted.binaryHash = object.file.hashes.quickXorHash;
+            }
+        }
+        else
+        {
+            object.generateHash = true;
+            formatted.binaryPath = object["@microsoft.graph.downloadUrl"];
+        }
+    }
+    
+    formatted.language = "undefined";    
+    formatted.isOriginalLanguage = true;
+    formatted.deletedFromSource = false;
+    
+    return formatted;
+        
+}
+
+private function getParentFromHierarchy(hierarchy){
+    return String.replace(hierarchy, "(.*)\\/.*", "$1", true);
+}
+
+private function push(object){
+    Concurrency.push(object, data.output);
+    
+    if(counter % 1000 == 0)
+    {
+        Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed objects(s): " :: counter}, data.output);
+    }
+    
+    counter++;
+    
+}
+
+private function normalizePath(path){
+    return String.replace(path,"\\","/", false, true, 0);
+}
+
+private function tokenIsValid(){
+    
+    if(token == null || Date.diff(token.tokenTime, Date.now()).totalSeconds > token.expires_in - 120){
+        token = GraphHelpers->getToken(data.clientId, data.clientSecret, data.tenantId);
+    }
+    return token.access_token;
+}
+
+function pathToName(path) {
+     path = String.replace(path, "(.*[/])(.*)", "$2");
+     path = String.replace(path, "(\\.[\\-0-9a-zA-Z]+)$", "");
+     return path;
+}
+
+function pathToExtension(path) {
+     var ext = String.replace(path, "(.*)([/])(.*\\.)([/-0-9a-zA-Z]+)$", "$4");
+     // required because Xill returns the entire string if no match is found!
+     if (String.length(ext) == String.length(path)) {
+          ext = null;
+     }
+     return (ext);
+}
+
+private function init(){
+    
+    if(data.source == null){
+        data.source = "Sharepoint";
+    }
+    
+    if(data.toUdm == null){
+        data.toUdm = true;
+    }
+    
+    if(data.type == null){
+        data.type = "sites";
+    }
+    
+    data.baseUrl = "https://graph.microsoft.com/v1.0/";
+    
+    
+    if(data.subSites == null){
+        data.subSites = [];
+    }
+    
+    if(data.hashing == null){
+        data.hashing = {
+            "enabled" : false
+        };
+    }
+    
+    if(data.keyword == null){
+        data.keyword = "*";
+    }
+}

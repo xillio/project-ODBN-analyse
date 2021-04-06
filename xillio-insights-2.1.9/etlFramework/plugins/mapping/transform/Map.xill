@@ -1,0 +1,81 @@
+// Description: formats objects into a new structure
+// Config usage:
+// {
+//      "mapping":{
+//          "values": {"value1":{"properties":{"_id":"%value%"}}, "value2":{"properties":{"_index":"%value%"}},"value3":{"properties":{"MD5":"%value%"}}}, name the values using the keyword value followed by a number
+//          "format": {"_id":"%value1%", "_index":"%value2%", "doc":{"file":{"hash":"%value3%"}}}, contruct the resulting object using the values
+//          "dateFields" : {
+//              "object.path.to.field.to.parse" : "dateformat"  
+//          }
+//       },
+//      (optional) "smartMapping" : when smart mapping is enabled only objects that are flaged to be mapped are processed, else the object is just pushed to the next queue
+// }
+
+use Concurrency, File, Stream, Hash, System, String, Date, Collection;
+
+include etlFramework.plugins.mapping.Helper as MappingHelpers;
+
+argument data = Concurrency.testInput({"mapping"  : {
+                "values": {"value1":{"udm":{"someValue":"%value"}}},
+                "format": {"fuki":"%value1%"},
+                "dateFields" : {}
+            }}, [{"doMapping":true, "udm":{"someValue":"something"}}]);
+
+init();
+
+var object = Concurrency.pop(data.input);
+
+while(object != null){
+    if(object.xillioType == "log"){
+        Concurrency.push(object, data.output);
+    }
+    else
+    {   
+        if((data.smartMapping == true && object.doMapping == true) || data.smartMapping == false){
+            do {
+                
+                var values = {};
+                foreach(key, value in data.mapping.values){
+                    values[key] = MappingHelpers->getFieldValue(object, value);
+                }
+                
+                if(data.smartMapping == true){
+                    
+                    MappingHelpers->setFieldValue(object, MappingHelpers->prepareField(data.targetField, MappingHelpers->format(values, data.mapping.format)));
+                }
+                else
+                {
+                    object = MappingHelpers->format(values, data.mapping.format);    
+                }
+                
+                
+                if(data.mapping.dateFields != {}){
+                    object = MappingHelpers->parseDates(object, "", data.mapping.dateFields);
+                }
+                
+                
+                
+                Concurrency.push(object, data.output);
+            }
+            fail(e){
+                Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+            }
+        }
+        else
+        {
+            Concurrency.push(object, data.output);
+        }
+    }
+    
+    object = Concurrency.pop(data.input);
+}
+
+private function init(){
+    if(data.smartMapping == null){
+        data.smartMapping = true;
+    }
+    
+    if(data.smartMapping == true){
+        data.targetField = {"udm":"%value%"};
+    }
+}

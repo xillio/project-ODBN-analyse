@@ -1,0 +1,15 @@
+use Assert, XURL, String, Date;
+
+function getToken(clientID, clientSecret, tenantID){
+    var body = "grant_type=client_credentials&resource=https://graph.microsoft.com&client_id=" :: clientID :: "&client_secret=" :: clientSecret :: "&scope=https://graph.microsoft.com/.default";
+    var result = XURL.post("https://login.microsoftonline.com/" :: tenantID :: "/oauth2/token", body, {"headers":{"Content-Type":"application/x-www-form-urlencoded"}});
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        Assert.error("Sharepoint error! " :: result.body.error_description);
+    }
+    else
+    {
+        result.body.tokenTime = Date.now();
+        return result.body;
+    }
+}

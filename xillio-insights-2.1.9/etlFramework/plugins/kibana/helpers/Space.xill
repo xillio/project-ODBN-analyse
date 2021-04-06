@@ -1,0 +1,80 @@
+use XURL, String,  Assert;
+
+include etlFramework.plugins.kibana.Helper as KibanaHelpers;
+
+function createSpace(id, configuration, kibana, kibanaVersion){
+
+    configuration.id = id;
+
+    var options = KibanaHelpers->getConnectionOptions(kibana);
+    options.headers["kbn-xsrf"] = kibanaVersion;
+    
+    var result = XURL.post(kibana.host :: "/api/spaces/space", configuration, options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        Assert.error("Kibana error! " :: result.body.error);
+    }
+    else
+    {
+        return result;
+    }
+}
+
+function updateSpace(id, configuration, kibana, kibanaVersion){
+
+    configuration.id = id;
+
+    var options = KibanaHelpers->getConnectionOptions(kibana);
+    options.headers["kbn-xsrf"] = kibanaVersion;
+    
+    var result = XURL.put(kibana.host :: "/api/spaces/space/" :: id, configuration, options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        Assert.error("Kibana error! " :: result.body.error);
+    }
+    else
+    {
+        return result;
+    }
+}
+
+function copySpace(configuration, kibana, kibanaVersion){
+    var options = KibanaHelpers->getConnectionOptions(kibana);
+    options.headers["kbn-xsrf"] = kibanaVersion;
+    
+    var result = XURL.post(kibana.host :: "/api/spaces/_copy_saved_objects", configuration, options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        Assert.error("Kibana error! " :: result.body.error);
+    }
+    else
+    {
+        return result;
+    }
+}
+
+function spaceExists(id, kibana){
+    var options = KibanaHelpers->getConnectionOptions(kibana);
+    var spaceExists = XURL.get(kibana.host :: "/api/spaces/space/" :: id, options);
+    if(spaceExists.status.code == 200)
+    {
+        return true;
+    }
+    else{
+        return false;
+    }
+}
+
+function getAllSpaces(kibana){
+    var options = KibanaHelpers->getConnectionOptions(kibana);
+    
+    var result = XURL.get(kibana.host :: "/api/spaces/space", options);
+    
+    if(String.startsWith(result.status.code, "2") != true){
+        Assert.error("Kibana error! " :: result.body.error);
+    }
+    else
+    {
+        return result;
+    }
+}

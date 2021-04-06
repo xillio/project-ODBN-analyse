@@ -1,0 +1,8 @@
+use Mongo;
+
+include etlFramework.plugins.mongo.Helper as MongoHelpers;
+
+function aggregate(collection, pipeline, options, mongo){
+    var connection = MongoHelpers->getConnection(mongo);
+    return Mongo.aggregate(collection, pipeline, options, connection);
+}

@@ -1,0 +1,145 @@
+use Concurrency, System, Mongo, Collection, XURL, Date;
+
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+
+argument data = Concurrency.testInput({}, []);
+
+var query = {
+    "size" : 0,
+    "query" : {
+        "bool" : {
+            "filter" : [
+                {
+                    "term" : {
+                        "reversedVersionOrder" : 1
+                    }
+                }
+            ]
+        }
+    },
+    "aggs" : {
+        "hashes": {
+            "composite" : {
+            	"size" : 1000,
+                "sources" : [
+                    { "hash": { "terms" : { "field": "binaryHash" } } }
+                ]
+            }
+        }
+    }
+};
+
+var processing = true;
+
+var counter = 0;
+
+while(processing){
+    var duplicates = ElasticsearchHelpers->search(data.index, query, data.elasticsearch);
+    
+    foreach(duplicate in duplicates.body.aggregations.hashes.buckets){
+    
+        if(counter % 1000 == 0)
+        {
+            Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"info","xillioMessage": "Processed duplicate(s): " :: counter}, data.output);
+        }
+        
+        counter++; 
+         
+        if(duplicate.doc_count < 2){
+            continue;
+        }
+        
+        var dupQuery = {
+              "size" : 1000,
+              "query" : {
+                "bool" : {
+                    "filter" : [
+                        {
+                            "term" : {
+                                "reversedVersionOrder" : 1
+                            }
+                        },
+                        {
+                            "term": {
+                                    "binaryHash": {
+                                    "value": duplicate.key.hash
+                                }
+                            }
+                        }
+                    ]
+                }             
+              },
+              "aggs": {
+                "sources": {
+                  "terms": {
+                    "field": "source",
+                    "size": 25
+                  }
+                }
+              } 
+        };
+        
+        // if(data.analysisEnabled == true){
+        //     dupQuery.aggs[data.seperator] = {
+        //         "terms": {
+        //             "field": "analyticsClassification." :: data.seperator,
+        //             "size": 25
+        //           }
+        //     };
+        // }
+        
+        var subProcessing = true;
+        
+        var sources = ElasticsearchHelpers->search(data.index, dupQuery, true, "30m", data.elasticsearch);
+        
+        var sourcesList = [];
+        
+        foreach(source in sources.body.aggregations.sources.buckets){
+            sourcesList[] = source.key;
+        }
+        
+        // var seperatorResult = {};
+        // if(data.analysisEnabled == true){
+        //     foreach(item in sources.body.aggregations[data.seperator].buckets){
+        //         seperatorResult[item.key] = item.doc_count;
+        //     }
+        // }
+        
+        var hash;
+        
+        while(subProcessing == true){
+            if(Collection.length(sources.body.hits.hits) == 0){
+                subProcessing = false;
+            }
+            
+            foreach(hit in sources.body.hits.hits){
+                
+                var analyticsBinaryUnique = false;
+                        
+                if(hash != hit._source.binaryHash){
+                    analyticsBinaryUnique = true;
+                    hash = hit._source.binaryHash;
+                }
+                
+                var hitUpdateObject = {"_id":hit._id, "_index":hit._index, "analyticsBinaryHashCount" : duplicate.doc_count, "analyticsBinarySource":sourcesList, "analyticsBinaryUnique": analyticsBinaryUnique};
+                
+                // if(data.analysisEnabled == true && Collection.length(seperatorResult) > 0){
+                //     hitUpdateObject.analyticsBinaryHashCountPerSpace = seperatorResult;
+                // }
+                
+                Concurrency.push(hitUpdateObject, data.output);
+            }
+            
+            sources = ElasticsearchHelpers->scroll(sources.body._scroll_id, "30m", data.elasticsearch);
+        }
+        
+        ElasticsearchHelpers->deleteScroll(sources.body._scroll_id, data.elasticsearch);
+    }
+    
+    if(duplicates.body.aggregations.hashes.after_key != null){
+        query.aggs.hashes.composite.after = duplicates.body.aggregations.hashes.after_key;
+    }
+    else{
+        processing = false;
+    }
+}

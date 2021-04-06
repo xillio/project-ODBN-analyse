@@ -1,0 +1,56 @@
+// Description on how to use. The ETL function should contain a description on how it should be used.
+
+
+use Concurrency, System, Mongo, Collection, XURL, Assert, Date;
+
+argument data = Concurrency.testInput({}, []);
+
+// ---- START for transform and target functions only ----
+// Remove for source function
+
+var object = Concurrency.pop(data.input);
+
+while(object != null){
+    if(object.xillioType == "log"){
+        Concurrency.push(object, data.output);
+    }
+    else
+    {
+        execute(object, data, false);
+    }
+    object = Concurrency.pop(data.input); 
+}
+
+// ---- END for transform and target functions only ----
+
+
+
+
+// The execute function must contain the main processing logic.
+// For a source function this means at least getting the object from the source system and pushing it to the next queue. A source function doesn't contain a starting queue.
+// A source function must have a `source` property in the config that is added to the object extracted from the source system.
+// This property must be filled with a name specifying the source system.
+// For a transformation function you can basicly do anything with the object as long as it get the objects from a previous queue and pushes it to the next queue, use the boilerplate function below.
+// A target function doesn't push anything to the next queue but only executes a action on a (target) system, use the boilerplate function below.
+
+function execute(object, data, assert)
+{
+   do
+   {
+        // Write the function code here and push the the resulting object to the next queue (except for target functions)
+   }
+   fail(e)
+   {
+       
+       
+       // Checks the assert value for true or false. When extending the functionality of the function, set to true so you can implement your own error handeling.
+       if(assert){
+           Assert.error(e.message);
+       }
+       else
+       {
+           Concurrency.push({"timestamp":Date.format(Date.now(),"yyyy-MM-dd'T'HH:mm:ss.SSSX"), "xillioType":"log","xillioSubtype":"error","xillioRobot":System.info().robotUrl,"xillioMessage": e.message, "xillioObject":object}, data.output);
+       }
+   }
+   
+}

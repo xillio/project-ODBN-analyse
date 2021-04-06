@@ -1,0 +1,23 @@
+use Concurrency, System, Mongo, Collection, XURL;
+
+argument data = Concurrency.testInput({}, []);
+
+var object = Concurrency.pop(data.input);
+
+while(object != null){
+   if(object.xillioType == "log" && data.showObject == true){
+        System.print("Robot: " :: object.xillioRobot :: ", message: " :: object.xillioMessage :: ", object: " :: object.xillioObject, object.xillioSubtype);
+   }
+   else if(object.xillioType == "log")
+   {
+        if(object.xillioRobot != null){
+            System.print("Robot: " :: object.xillioRobot :: ", message: " :: object.xillioMessage, object.xillioSubtype);
+        }
+        else
+        {
+            System.print("Message: " :: object.xillioMessage, object.xillioSubtype);
+        }
+   }
+   object = Concurrency.pop(data.input);
+}
+

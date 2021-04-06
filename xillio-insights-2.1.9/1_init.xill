@@ -1,0 +1,15 @@
+use System, Concurrency, Date, File;
+
+include etlFramework.Settings as Settings;
+include etlFramework.plugins.elasticsearch.Helper as ElasticsearchHelpers;
+include Commons as Commons;
+
+var settings = Settings->getSettings();
+
+ElasticsearchHelpers->createTemplate("default", settings.system.defaultIndexTemplate, settings.general.elasticsearch);
+ElasticsearchHelpers->createTemplate("structure", settings.system.structureIndexTemplate, settings.general.elasticsearch);
+ElasticsearchHelpers->createTemplate("link", settings.system.linkIndexTemplate, settings.general.elasticsearch);
+
+Commons->initClassification();
+
+System.print("Finished initializing Xillio Insights", "INFO");
