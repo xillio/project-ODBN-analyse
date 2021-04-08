@@ -1,0 +1,39 @@
+use Collection, Mongo, MSSQL, Properties, System, String, Concurrency;
+
+include project.commons.Timer as timer;
+
+//-------------------------------------------------------------------------
+//						  SETUP
+//-------------------------------------------------------------------------
+
+var database = Mongo.connect(Properties.get("udm.database"));
+var collectionName = Properties.get("udm.collection");
+var timeObj = timer->start();
+var count = 0;
+
+var items = [];
+
+argument data = Concurrency.testInput({}, items);
+
+//-------------------------------------------------------------------------
+//						  MAIN
+//-------------------------------------------------------------------------
+
+// Set item
+var item = Concurrency.pop(data.input);
+
+// Loop through items (folders)
+while(item != null) {
+    if( count % 100 == 0 ) {
+        System.print("Processed " :: count :: " nodes (speed: " :: timer->avgSpeed(timeObj, count) :: ")", "info"); 
+    }
+    
+    count++;
+    
+    item = Concurrency.pop(data.input);
+}
+
+
+
+
+

@@ -1,0 +1,123 @@
+use Collection, Mongo, MSSQL, Properties, File, System, String, Concurrency, Assert, Date, Excel;
+
+
+//-------------------------------------------------------------------------
+//						  SETUP
+//-------------------------------------------------------------------------
+
+// Database connection
+var database = Mongo.connect(Properties.get("udm.database"));
+
+// Define Excel workbook
+var path = Properties.get("project.reports.path") :: "/" :: getWorkbookName("ReportUsers");
+var workbook = Excel.createWorkbook(path);
+var maxDepth = 3;
+
+// Define Excel sheets
+var s = 1;
+var sheets = {
+    s++: Excel.createSheet(workbook, "Users"),
+};
+
+//-------------------------------------------------------------------------
+//						  MAIN
+//-------------------------------------------------------------------------
+
+// Set headers
+
+// Totals
+s = 1;
+var c = 1; 
+addRow({c++: "systemName", c++: "total"}, sheets[s++]);
+
+// Report
+s = 1;
+reportUsers(sheets[s++]);
+
+// Properties sheet
+
+// Save workbook
+Excel.save(workbook);
+System.print('Created report at path ' :: path);
+
+//-------------------------------------------------------------------------
+//						  FUNCTION
+//-------------------------------------------------------------------------
+
+function reportUsers(sheet) {
+    var c = 1;
+    
+    var pipeline = [
+        {
+            "$match": {
+                "modified.properties.additional-metadata.creator": {"$exists": true},
+            }
+        },
+        {
+            "$project": {
+                "user": [
+                    {"systemName": "$modified.properties.additional-metadata.creator"}
+                ]
+            }
+        },
+        {
+            "$unwind": "$user"
+        },
+        {
+            "$group": {
+                "_id": {
+                    "systemName": "$user.systemName"
+                },
+                "total": {"$sum": 1}
+            }
+        },
+        {
+            "$project": {
+                "_id": 0,
+                c++: "$_id.systemName",
+                c++: "$total"
+            }
+        }
+    ];
+    
+    createReport(pipeline, sheet);
+}
+
+private function getSheets(workbook) {
+    var sheets = {};
+    var sheetNames = Excel.getSheetNames(workbook);
+    
+    foreach(index, sheetName in sheetNames) {
+        sheets[index+1] = Excel.loadSheet(workbook, sheetName);
+    }
+    
+    return sheets;
+}
+
+private function getWorkbookName(name) {
+    var now = Date.parse(null, null, "nl-NL");
+    var timestamp = Date.info(now).instantSeconds;
+
+    var workbookName = name :: "_" :: timestamp;
+    
+    return workbookName :: ".xlsx";
+}
+
+function createReport(pipeline, sheet) {
+    var rows = Mongo.aggregate("documents", pipeline, {"batchSize": 100, "allowDiskUse": true}, database);
+    
+    foreach(row in rows) {
+        addRow(row, sheet);
+    }
+}
+
+function addRow(data, sheet) {
+    sheet.rows++;
+    
+    foreach(columnIndex, value in data) {
+    if(System.typeOf(value) != ATOMIC){
+        value = String.join(value, ";");
+    }
+        Excel.setCellValue(sheet, columnIndex, sheet.rows, value);
+    }
+}

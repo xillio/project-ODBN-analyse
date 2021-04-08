@@ -1,0 +1,277 @@
+use Mongo, Properties, Date, System, String, Hash, Collection, File;
+
+//-------------------------------------------------------------------------
+//						  SETUP
+//-------------------------------------------------------------------------
+
+var database = Mongo.connect(Properties.get("mongo.database"));
+var collectionName = Properties.get("mongo.collection");
+
+//-------------------------------------------------------------------------
+//						  FUNCTIONS
+//-------------------------------------------------------------------------
+
+
+
+function storeDocument(node) {
+    var update = {};
+    var logs = [];
+    var result;
+    var document = {};
+    
+    do {
+        
+        document._id = createId(node.udm.id);
+        document = mapObject(document, node);
+        
+        return document;
+        
+    } fail(error) {
+        
+        update["migration.export.pipe"] = false;
+        logs[] = {"datetime": Date.now(), "message": error, "type": "error"};
+        
+    } success {
+        
+        update["migration.export.pipe"] = true;
+        logs[] = {"datetime": Date.now(), "message": "Successfully exported via PIPE", "type": "info"};
+        
+    } finally {
+        
+        // Store document
+        Mongo.updateOne(collectionName, {"_id": document._id}, {"$set": document + update, "$push": {"migration.logs": {"$each": logs}}}, {"upsert": true}, database);
+        
+    }
+}
+
+function mapObject(document, node) {
+    var kind;
+    var original = {};
+    
+    // Add all node properties
+    original.properties = getCleanProperties(node.properties);
+    
+    original = mapDefault(original, node);
+    
+    if( hasChildren(node) == true ) {
+        original = mapFolder(original, node);
+        kind = "Folder";
+    } else {
+        original = mapDocument(original, node);
+        kind = "Document";
+    }
+    
+    document += {
+        "kind": kind,
+        "original": original,
+        "modified": original
+    };
+    
+    return document;
+}
+private function mapDefault(original, node) {
+    var udm = node.udm;
+    var name = udm.name;
+    var properties = node.properties;
+    
+    var parentId = createId(udm.parent);
+    var ancestors = getAncestorsFromPath(udm.parent);
+    
+    // Get authors from metadata
+    var createdAuthor = getAuthor(properties, ["creator", "dc:creator", "meta:author", "Author", "meta:last-author", "Last-Author"]);
+    var modifiedAuthor = getAuthor(properties, ["meta:last-author", "Last-Author", "creator", "dc:creator", "meta:author", "Author"]);
+    
+    var created = created(udm.dateCreated, createdAuthor);
+    var modified = created(udm.dateModified, modifiedAuthor);
+    var accessed = created(udm.dateAccessed, modifiedAuthor);
+    
+    var parentPath = "";
+    if( udm && udm.parent ) {
+        parentPath = udm.parent;
+    } 
+    
+    original += {
+        "contentType": {
+            "systemName": udm.subType,
+            "displayName": udm.subType
+        },
+        "parent": {
+            "id": parentId,
+            "path": parentPath,
+            "ancestors": ancestors
+        },
+        "created" : created,
+        "modified" : modified,
+        "accessed" : accessed
+    };
+    
+    return original;
+}
+
+
+private function mapFolder(original, node) {
+    var udm = node.udm;
+    var name = udm.name;
+    var properties = node.properties;
+    
+    original += {
+        "container" : {
+            "hasChildren" : true
+        }
+    };
+    
+    original += {
+        "fileSystem" : {
+            "path" : udm.id,
+            "depth": getLevelFromPath(udm.id)
+        },
+        "name" : {
+            "systemName" : name,
+            "displayName" : name,
+            "normalized" : normalized(name),
+        }
+    };
+    
+    return original;
+}
+
+
+private function mapDocument(original, node) {
+    var udm = node.udm;
+    var name = udm.name :: "." :: udm.binaryExtension;
+    var properties = node.properties;
+    
+    var size = udm.binaryByteSizeAsNumber;
+    var path = udm.id;
+    var mimeType;
+    
+    if( properties["additional-metadata"] && properties["additional-metadata"]["Content-Type"] ) {
+        mimeType = properties["additional-metadata"]["Content-Type"];
+    } else {
+        mimeType = File.getMimeType(udm.id);
+    }
+    
+    
+    original += {
+        "file": {
+            "extension": udm.binaryExtension,
+            "rawExtension": udm.binaryExtension,
+            "size": size
+        },
+        "mimeType": {
+            "type": mimeType
+        },
+        "versions": [{
+            "number" : 1,
+            "name" : udm.name,
+            "filevalue": getFileValue(udm.id)
+        }],
+        "fileSystem" : {
+            "path" : udm.id,
+            "depth": getLevelFromPath(udm.id)
+        },
+        "name" : {
+            "systemName" : name,
+            "displayName" : name,
+            "normalized" : normalized(name),
+        }
+    };
+    
+    return original;
+}
+
+private function hasChildren(node) {
+    if( node.udm.type != "Document" ) {
+        return true;
+    }
+    
+    return false;
+}
+
+
+private function created(date, systemName) { return created(date, systemName, null); }
+private function created(date, systemName, displayName) {
+    return {
+        "date" : formatDate(date),
+        "by": {
+            "systemName": systemName,
+            "displayName": displayName,
+            "email": ""
+        }
+        
+    };
+}
+
+private function formatDate(date) {
+    if( date ) {
+        return Date.parse(String.replace(date,"\\..*",""), "yyyy-MM-dd'T'HH:mm:ss"); //2015-11-30T08:22:09.000-08:00;
+    }
+}
+
+private function createId(path) {
+    // return Hash.toMD5(path);
+    return path;
+}
+
+private function getAncestorsFromPath(path) {
+    path = String.replace(path, "//", "\\\\", false);
+
+    var list = String.split(path, "/");
+    var ancestors = [];
+    while(Collection.length(list)) {
+        var ancestorPath = String.join(list, "/");
+        
+        ancestorPath = String.replace(ancestorPath, "\\\\", "//", false);
+        
+        ancestors[] = ancestorPath;
+        var length = Collection.length(list);
+        Collection.remove(list, length-1);
+    }
+    
+    return Collection.reverse(ancestors);
+}
+
+private function normalized(string) {
+    return String.toLower(String.trim(string, true));
+}
+
+private function getLevelFromPath(path) {
+    var list = String.split(path, "/");
+    return Collection.length(list);
+}
+
+private function getCleanProperties(properties) {
+    var cleanProperties = {};
+    
+    if( System.typeOf(properties) == OBJECT ) {
+        cleanProperties = Collection.duplicate(properties);
+        
+        if( properties["additional-metadata"] ) {
+            var propertyList = [];
+            
+            foreach(key, value in properties["additional-metadata"]) {
+                propertyList[] = {
+                    "systemName": key,
+                    "value": value
+                };
+            }
+            
+            cleanProperties["additional-metadata"] = propertyList;
+        }
+    }
+    
+    return cleanProperties;
+}
+
+// Return value not equal to NULL
+private function getAuthor(properties, fields) {
+    if( System.typeOf(properties) == OBJECT && properties["additional-metadata"] ) {
+        foreach(f in fields) {
+            if( properties["additional-metadata"][f] ) { return properties["additional-metadata"][f]; }
+        }
+    }
+}
+
+private function getFileValue(path) {
+    return String.replace(path, "[A-Z]:/", "", true);
+}

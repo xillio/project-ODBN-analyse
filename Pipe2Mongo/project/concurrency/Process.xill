@@ -1,0 +1,33 @@
+use Collection, Mongo, MSSQL, Properties, System, String, Concurrency;
+
+include project.extract.Extract as extract;
+
+//-------------------------------------------------------------------------
+//						  SETUP
+//-------------------------------------------------------------------------
+
+var items = [];
+
+argument data = Concurrency.testInput({}, items);
+
+//-------------------------------------------------------------------------
+//						  MAIN
+//-------------------------------------------------------------------------
+
+// Set item
+var item = Concurrency.pop(data.input);
+
+// Loop through items (folders)
+while(item != null) {
+    
+    if( item.path && item.udm ) {
+        extract->storeDocument(item);
+    }
+    
+    item = Concurrency.pop(data.input);
+}
+
+
+
+
+

@@ -1,0 +1,197 @@
+/**
+ * Project: Alfresco
+ * Author: Arthur van der Wal
+ * Date: 12/07/2019
+ *
+ *
+ *
+ */
+
+use Web, System, XURL, Properties, File, Stream, String, Collection, Encode, Date, Hash, Assert, Mongo;
+
+//-------------------------------------------------------------------------
+//						  SETUP
+//-------------------------------------------------------------------------
+
+var database = Mongo.connect(Properties.get("udm.database"));
+var collectionName = Properties.get("udm.collection");
+
+
+//-------------------------------------------------------------------------
+//						  DEMO
+//-------------------------------------------------------------------------
+
+accumulate(3);
+
+//-------------------------------------------------------------------------
+//						  FUNCTIONS
+//-------------------------------------------------------------------------
+
+function accumulate(maxLevel) {
+
+    Mongo.createIndex(collectionName, {"kind": 1}, {}, database);
+    Mongo.createIndex(collectionName, {"modified.fileSystem.depth": 1}, {}, database);
+    Mongo.createIndex(collectionName, {"original.parent.ancestors": 1}, {}, database);
+
+    var query = {
+        "kind": "Folder",
+        "modified.fileSystem.depth": {"$lte": maxLevel}
+    };
+    var count = Mongo.count(collectionName, query, database);
+    var folders = Mongo.find(collectionName, query, {}, {}, {"noCursorTimeout": true}, database);
+    
+    foreach(f in folders) {
+        var update = {};
+        
+        do {
+            
+            update["original.fsa.total"] = accumulateTotal(f._id);
+            update["original.fsa.size"] = accumulateSize(f._id);
+            update["original.fsa.kind"] = accumulateKind(f._id);
+            update["original.fsa.extensions"] = accumulateExtensions(f._id);
+            update["original.fsa.mimeTypes"] = accumulateMimeTypes(f._id);
+            update["original.fsa.contentTypes"] = accumulateContentTypes(f._id);
+            
+            null;
+            
+        } fail(error) {
+            
+            System.print(error);
+            
+        } success {
+            
+            
+            
+        } finally {
+            
+            Mongo.updateOne(collectionName, {"_id": f._id}, {"$set": update}, {}, database);
+            
+            if( count % 100 == 0 ) {
+                System.print("Folders in progress " :: count);
+            }
+            count--;
+        }
+        
+    }
+    
+}
+
+private function accumulateTotal(id) {
+    var count = Mongo.count(collectionName, {"original.parent.ancestors": id}, database);
+    return count;
+}
+
+
+private function accumulateKind(id) {
+    var pipeline = [
+        {
+            "$match": {
+                "original.parent.ancestors": id,
+            }
+        },
+        {
+            "$group": {
+                "_id": "$kind",
+                "total": {"$sum": 1}
+            }
+        }
+        
+    ];
+    var result = Mongo.aggregate(collectionName, pipeline, {}, database);
+
+    return collect(result);
+}
+
+private function accumulateSize(id) {
+    var pipeline = [
+        {
+            "$match": {
+                "kind": "Document",
+                "original.parent.ancestors": id,
+            }
+        },
+        {
+            "$group": {
+                "_id": "$kind",
+                "total": {"$sum": "$original.file.size"}
+            }
+        }
+        
+    ];
+    var result = Mongo.aggregate(collectionName, pipeline, {}, database);
+
+    foreach(r in result) {
+        return r.total;
+    }
+}
+
+private function accumulateExtensions(id) {
+    var pipeline = [
+        {
+            "$match": {
+                "kind": "Document",
+                "original.parent.ancestors": id,
+            }
+        },
+        {
+            "$group": {
+                "_id": "$original.file.extension",
+                "total": {"$sum": 1},
+                "size": {"$sum": "$original.file.size"},
+            }
+        }
+        
+    ];
+    var result = Mongo.aggregate(collectionName, pipeline, {}, database);
+
+    return collect(result);
+}
+
+private function accumulateMimeTypes(id) {
+    var pipeline = [
+        {
+            "$match": {
+                "kind": "Document",
+                "original.parent.ancestors": id,
+            }
+        },
+        {
+            "$group": {
+                "_id": "$original.mimeType.type",
+                "total": {"$sum": 1}
+            }
+        }
+        
+    ];
+    var result = Mongo.aggregate(collectionName, pipeline, {}, database);
+
+    return collect(result);
+}
+
+private function accumulateContentTypes(id) {
+    var pipeline = [
+        {
+            "$match": {
+                "original.parent.ancestors": id,
+            }
+        },
+        {
+            "$group": {
+                "_id": "$original.contentType.systemName",
+                "total": {"$sum": 1}
+            }
+        }
+        
+    ];
+    var result = Mongo.aggregate(collectionName, pipeline, {}, database);
+
+    return collect(result);
+}
+
+
+
+
+
+
+
+

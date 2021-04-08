@@ -1,0 +1,74 @@
+use Collection, Mongo, MSSQL, Properties, System, String, Concurrency, Properties;
+
+
+//-------------------------------------------------------------------------
+//						  SETUP
+//-------------------------------------------------------------------------
+
+var REQUESTCOLLECTION = "_requestStore";
+var MAXREQUESTWITHOUTRESULT = 10;
+
+var requestCountWithoutResult = 0;
+var database = Mongo.connect(Properties.get("udm.database"));
+var collectionName = Properties.get("udm.collection");
+
+
+//-------------------------------------------------------------------------
+//						  FUNCTIONS
+//-------------------------------------------------------------------------
+
+function createStoreIndexes() {
+    
+    Mongo.createIndex(REQUESTCOLLECTION, {"status.processing": 1}, {}, database);
+    Mongo.createIndex(REQUESTCOLLECTION, {"status.done": 1}, {}, database);
+    Mongo.createIndex(REQUESTCOLLECTION, {"status.error": 1}, {}, database);
+
+}
+
+function requestsInQueue() {
+    var count = Mongo.count(REQUESTCOLLECTION, {"status.done": {"$ne": true}, "status.error": {"$ne": true}}, database);
+    
+    if( count == 0 ) {
+        requestCountWithoutResult++;
+    }
+    
+    // Stop providing requests
+    if( requestCountWithoutResult > MAXREQUESTWITHOUTRESULT ) {
+        return false;
+    }
+    
+    // continue providing
+    return true;
+}
+
+function getRequestsForProcessing() {
+    return Mongo.find(REQUESTCOLLECTION, {"status.processing": false, "status.done": false}, {}, {}, {"noCursorTimeout": true, "batchSize": 100}, database);
+}
+
+function requestProvided(request) {
+    Mongo.updateOne(REQUESTCOLLECTION, {"_id": request._id}, {"$set": {"status.processing": true}}, {}, database);
+}
+function requestSendForProcessing(request) {
+    Mongo.updateOne(REQUESTCOLLECTION, {"_id": request._id}, {"$set": {"status.done": true}}, {}, database);
+}
+
+function addRequest(request) {
+    request += {
+        "status" : {
+            "inQueue" : false,
+            "processing" : false,
+            "done" : false
+        }
+    };
+    
+    Mongo.insertOne(REQUESTCOLLECTION, request, database);
+}
+
+function dropRequestStore() {
+    Mongo.drop(REQUESTCOLLECTION, database);
+}
+
+
+
+
+
