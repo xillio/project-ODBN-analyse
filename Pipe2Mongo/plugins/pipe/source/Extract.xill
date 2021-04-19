@@ -145,7 +145,7 @@ private function parseDocument(object){
     }
     
     formatted.source = object.source;
-    formatted.name = pathToName(object.path);
+    formatted.name = pathToName(object.path, object.properties.isDirectory);
     formatted.state = [];
     
         
@@ -197,14 +197,16 @@ private function normalizePath(path){
     return String.replace(path,"\\","/", false, true, 0);
 }
 
-function pathToName(path) {
+function pathToName(path, isDir) {
      path = String.replace(path, "(.*[/])(.*)", "$2");
-     path = String.replace(path, "(\\.[\\-0-9a-zA-Z]+)$", "");
+     if( isDir != true ) {
+        path = String.replace(path, "(\\.[\\-0-9a-zA-Z]+)$", "");
+     }
      return path;
 }
 
 function pathToExtension(path) {
-     var ext = String.replace(path, "(.*)([/])(.*\\.)([/-0-9a-zA-Z]+)$", "$4");
+     var ext = String.replace(path, "(.*)([/])(.*\\.)([0-9a-zA-Z/-]+)$", "$4");
      // required because Xill returns the entire string if no match is found!
      if (String.length(ext) == String.length(path)) {
           ext = null;

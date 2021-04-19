@@ -1,81 +1,108 @@
 use Collection, Mongo, MSSQL, Properties, File, System, String, Concurrency, Assert, Date, Excel;
 
-
+include Settings as Settings;
+include Commons as Commons;
 //-------------------------------------------------------------------------
 //						  SETUP
 //-------------------------------------------------------------------------
-
-// Database connection
-var database = Mongo.connect(Properties.get("udm.database"));
-
+var database;
+var collection;
 // Define Excel workbook
-var path = Properties.get("project.reports.path") :: "/" :: getWorkbookName("ReportContainers");
-var workbook = Excel.createWorkbook(path);
+var reportName = "Report";
+var path;
+var workbook;
 var maxDepth = 3;
 
-// Define Excel sheets
-var s = 1;
-var sheets = {
-    s++: Excel.createSheet(workbook, "Totals"),
-    s++: Excel.createSheet(workbook, "ContentTypes"),
-    s++: Excel.createSheet(workbook, "Containers"),
-    s++: Excel.createSheet(workbook, "ContentTypes per root"),
-    s++: Excel.createSheet(workbook, "Properties per contentType"),
-    s++: Excel.createSheet(workbook, "Categories per contentType"),
-    s++: Excel.createSheet(workbook, "Extensions"),
+var settings = Settings->getSettings();
+
+foreach(name, repositorySettings in settings.repositories){
     
-};
+    repositorySettings = Commons->initRepository(repositorySettings, name);
+    
+    if(repositorySettings.enabled == true && repositorySettings.type == "pipe"){
+    
+        System.print("Start creating report for " :: name, "INFO");
+        
+        mainReport(repositorySettings);
+        
+        System.print("Finished creating report "::reportName::" for " :: name::" at path " :: path, "INFO");
+    }else{
+        
+        System.print("Skipped connector type: " :: repositorySettings.type :: " for " :: name :: ". enabled = " :: repositorySettings.enabled, "INFO");
+    }
+}
 
-//-------------------------------------------------------------------------
-//						  MAIN
-//-------------------------------------------------------------------------
+function mainReport(config){
 
-// Set headers
+    database =  Mongo.connect(config.mongo.name, config.mongo.host, config.mongo.port, config.mongo.username, config.mongo.password);
+    collection = config.mongo.collection;
+    path = config.reports.reportPath::"/" :: config.config.source :: "-" :: getWorkbookName(reportName);
+    workbook = Excel.createWorkbook(path);
+    
+    // Define Excel sheets
+    var s = 1;
+    var sheets = {
+        s++: Excel.createSheet(workbook, "Totals"),
+        s++: Excel.createSheet(workbook, "ContentTypes"),
+        s++: Excel.createSheet(workbook, "Containers"),
+        s++: Excel.createSheet(workbook, "ContentTypes per root"),
+        s++: Excel.createSheet(workbook, "Properties per contentType"),
+        s++: Excel.createSheet(workbook, "Categories per contentType"),
+        s++: Excel.createSheet(workbook, "Extensions"),
+        
+    };
+    
+    //-------------------------------------------------------------------------
+    //						  MAIN
+    //-------------------------------------------------------------------------
+    
+    // Set headers
+    
+    // Totals
+    s = 1;
+    var c = 1; 
+    addRow({c++: "Type", c++: "Total", c++: "Size"}, sheets[s++]);
+    
+    c = 1; 
+    addRow({c++: "Type", c++: "ContentType", c++: "Total"}, sheets[s++]);
+    
+    // Containers
+    c = 1; 
+    addRow({c++: "Type", c++: "Path", c++: "Id", c++: "Depth", c++: "Total", c++: "Size in MB"}, sheets[s++]);
+    
+    // ContentTypes per Root
+    c = 1; 
+    addRow({c++: "Type", c++: "Path", c++: "Id", c++: "Depth", c++: "ContentType", c++: "Total"}, sheets[s++]);
+    
+    // Properties per ContentType
+    c = 1; 
+    addRow({c++: "Kind", c++: "ContentType", c++: "FieldId", c++: "Field", c++: "Total", c++: "Example"}, sheets[s++]);
+    
+    
+    // Properties per ContentType
+    c = 1; 
+    addRow({c++: "Kind", c++: "ContentType", c++: "Category", c++: "Field", c++: "Type", c++: "Total", c++: "Example"}, sheets[s++]);
+    
+    // Extensions
+    c = 1; 
+    addRow({c++: "Extension", c++: "Total", c++: "Size"}, sheets[s++]);
+    
+    // Report
+    s = 1;
+    reportKind(sheets[s++]);
+    reportContentType(sheets[s++]);
+    reportContainers(sheets[s++]);
+    reportContentTypesPerRoot(sheets[s++]);
+    reportPropertiesPerContentType(sheets[s++]);
+    reportCategoriesPerContentType(sheets[s++]);
+    reportExtensions(sheets[s++]);
+    
+    // Save workbook
+    Excel.save(workbook);
+    System.print('Created report: '::reportName::' at path ' :: path);
+}
 
-// Totals
-s = 1;
-var c = 1; 
-addRow({c++: "Type", c++: "Total", c++: "Size"}, sheets[s++]);
 
-c = 1; 
-addRow({c++: "Type", c++: "ContentType", c++: "Total"}, sheets[s++]);
-
-// Containers
-c = 1; 
-addRow({c++: "Type", c++: "Path", c++: "Id", c++: "Depth", c++: "Total", c++: "Size in MB"}, sheets[s++]);
-
-// ContentTypes per Root
-c = 1; 
-addRow({c++: "Type", c++: "Path", c++: "Id", c++: "Depth", c++: "ContentType", c++: "Total"}, sheets[s++]);
-
-// Properties per ContentType
-c = 1; 
-addRow({c++: "Kind", c++: "ContentType", c++: "FieldId", c++: "Field", c++: "Total", c++: "Example"}, sheets[s++]);
-
-
-// Properties per ContentType
-c = 1; 
-addRow({c++: "Kind", c++: "ContentType", c++: "Category", c++: "Field", c++: "Type", c++: "Total", c++: "Example"}, sheets[s++]);
-
-// Extensions
-c = 1; 
-addRow({c++: "Extension", c++: "Total", c++: "Size"}, sheets[s++]);
-
-// Report
-s = 1;
-reportKind(sheets[s++]);
-reportContentType(sheets[s++]);
-reportContainers(sheets[s++]);
-reportContentTypesPerRoot(sheets[s++]);
-reportPropertiesPerContentType(sheets[s++]);
-reportCategoriesPerContentType(sheets[s++]);
-reportExtensions(sheets[s++]);
-
-// Properties sheet
-
-// Save workbook
-Excel.save(workbook);
-System.print('Created report at path ' :: path);
 
 //-------------------------------------------------------------------------
 //						  FUNCTION
@@ -401,7 +428,7 @@ private function getWorkbookName(name) {
 }
 
 function createReport(pipeline, sheet) {
-    var rows = Mongo.aggregate("documents", pipeline, {"batchSize": 100, "allowDiskUse": true}, database);
+    var rows = Mongo.aggregate(collection, pipeline, {"batchSize": 100, "allowDiskUse": true}, database);
     
     foreach(row in rows) {
         addRow(row, sheet);

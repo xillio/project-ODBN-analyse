@@ -1,0 +1,32 @@
+// holds Insights shared functions
+
+use System, Concurrency, Date, File, Math;
+
+include Settings as Settings;
+
+var settings = Settings->getSettings();
+
+function initRepository(repositorySettings, name){
+ 
+    repositorySettings.config.source = name;
+    repositorySettings.config.index = name;
+    repositorySettings.config.index = String.toLower(repositorySettings.config.index);
+    repositorySettings.config.index = String.replace(repositorySettings.config.index, "[^0-9a-zA-Z]", "");
+    
+    repositorySettings.enabled = true;
+    
+    if(Collection.length(settings.general.includedRepositories) > 0 && Collection.contains(settings.general.includedRepositories, name) == false){
+        repositorySettings.enabled = false;
+    }
+    
+    if(Collection.contains(settings.general.excludedRepositories, name)){
+        repositorySettings.enabled = false;
+    }
+    
+    if(repositorySettings.location == null){
+        repositorySettings.location = "etlFramework/plugins/";
+    }
+    
+    return repositorySettings;
+}
+

@@ -2,7 +2,7 @@
   "modules": {
     "getFiles": {
       "type": "jsonlineReader",
-      "inputDir":"F:/data/pipe/extract/test/files",
+      "inputDir":"F:/data/pipe/extract/decosdrive/files5",
       "filePrefix": "files",
       "outputTo": [
         "hasher"
@@ -24,15 +24,15 @@
     },
     "output": {
       "type": "jsonlineWriter",
-       "preClean" : "true",
-      "filePrefix": "hashed",
-      "outputDir" : "F:/data/pipe/hashed/test/files" 
+       "preClean" : "false",
+      "filePrefix": "hashed5",
+      "outputDir" : "F:/data/pipe/hashed/decosdrive/files" 
     },
     "errors": {
       "type": "jsonlineWriter",
-      "filePrefix": "errors",
-      "preClean" : "true",
-      "outputDir" : "F:/data/pipe/hashed/test/errors" 
+      "filePrefix": "errors5",
+      "preClean" : "false",
+      "outputDir" : "F:/data/pipe/hashed/decosdrive/errors" 
     }
   }
 }

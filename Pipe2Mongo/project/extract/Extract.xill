@@ -4,8 +4,8 @@ use Mongo, Properties, Date, System, String, Hash, Collection, File;
 //						  SETUP
 //-------------------------------------------------------------------------
 
-var database = Mongo.connect(Properties.get("mongo.database"));
-var collectionName = Properties.get("mongo.collection");
+var database ;// = Mongo.connect(Properties.get("mongo.database"));
+var collectionName;// = Properties.get("mongo.collection");
 
 //-------------------------------------------------------------------------
 //						  FUNCTIONS
@@ -13,7 +13,9 @@ var collectionName = Properties.get("mongo.collection");
 
 
 
-function storeDocument(node) {
+function storeDocument(node, mongo,source) {
+    database =  Mongo.connect(mongo.name, mongo.host, mongo.port, mongo.username, mongo.password);
+    collectionName = mongo.collection;
     var update = {};
     var logs = [];
     var result;
@@ -22,6 +24,7 @@ function storeDocument(node) {
     do {
         
         document._id = createId(node.udm.id);
+        document.source = source;
         document = mapObject(document, node);
         
         return document;
@@ -176,6 +179,15 @@ private function mapDocument(original, node) {
             "normalized" : normalized(name),
         }
     };
+    
+    if(udm.binaryHash){
+        original += {
+            "hash":{
+                "md5":udm.binaryHash,
+                "flag": false
+            }     
+        };      
+    }
     
     return original;
 }

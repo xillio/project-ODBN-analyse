@@ -2,7 +2,7 @@
   "modules": {
 		"getFiles": {
 			"type": "filescraper",
-			"rootDir": "M:/72365595 Monique Z117665",
+			"rootDir": "J:/",
 			"zoneId": "UTC",
 			"dateTimePattern": "yyyy-MM-dd'T'HH:mm:ss.SSSX",
 			"filesTo": [
@@ -19,19 +19,19 @@
       "type": "jsonlineWriter",
       "preClean" : "true",
       "filePrefix": "files",
-      "outputDir" : "F:/data/pipe/extract/test/files" 
+      "outputDir" : "F:/data/pipe/extract/decosdrive/files1" 
     },
     "folders": {
       "type": "jsonlineWriter",
       "filePrefix": "folders",
       "preClean" : "true",
-     "outputDir" : "F:/data/pipe/extract/test/files" 
+     "outputDir" : "F:/data/pipe/extract/decosdrive/folders" 
     },
     "errors": {
       "type": "jsonlineWriter",
       "filePrefix": "errors",
       "preClean" : "true",
-      "outputDir" : "F:/data/pipe/extract/test/errors" 
+      "outputDir" : "F:/data/pipe/extract/decosdrive/errors" 
     }
   }
 }
