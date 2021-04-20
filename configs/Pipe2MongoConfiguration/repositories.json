@@ -18,14 +18,14 @@
             "collection":"documents"
         }
 	} ,
-	"decos" : {
+	"decosdrive" : {
         "type" : "pipe",
         "config": {
             "xillioPipe" : {
                 "host" : "http://localhost:5050"
             },
             "pipeline" : "scraper",
-            "path" : "F:/data/pipe/hashed/m-drive/files",
+            "path" : "F:/data/pipe/hashed/decosdrive/files",
             "startPipeline" : false
         },
         "mongo" : {
