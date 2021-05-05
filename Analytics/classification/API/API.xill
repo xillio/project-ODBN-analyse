@@ -1,0 +1,112 @@
+use Mongo, System, Excel, String, Collection, File, XURL, Stream, Hash;
+
+function OCR(doc, ocrOutputDir, powerPdfConverterPath){
+    var name = Hash.toMD5(doc._id);
+    var prompt = System.exec([powerPdfConverterPath, "-I" :: doc._id, "-O" :: ocrOutputDir::name ::".jpg" , "-TPDFS", "-Q", "-V1B", "-K"]);
+    var body = File.openRead(ocrOutputDir:: doc.original.name);
+    var resp = XURL.put("http://127.0.0.1:9998/tika", body) ;
+    var update = { 
+        "$set" : {
+            "source.current.text" : resp.body,
+            "source.current.hash" : name
+        }
+    };
+    Mongo.updateOne("report_Potential_Title", {"_id" : doc._id}, update);
+}
+
+function mergeList(lists){
+    var controleList = [];
+    foreach(list in lists){
+        controleList = controleList + list;
+    }
+    return controleList;
+}
+
+function setSearchTerm(item, list){
+    foreach(term, value in list){
+        if (Collection.contains(value, item)){
+            return term;
+        }
+    }
+    return item;
+}
+
+function itemToUdm(doc, item){
+    var udm = {
+        "_id" : doc._id,
+        "source" : {
+            "current" : {
+                "category"  : item,
+                "extension" : doc.original.file.rawExtension,
+                "size"      : doc.original.file.size,
+                "name"      : doc.original.name.systemName,
+               // "hash"      : doc.original.file.hash.md5
+            }
+        }
+        
+    };
+    udm.target = Collection.duplicate(udm.source);
+    var result = Mongo.replaceOne("report_classification_Title",{"_id" : udm._id}, udm,{"upsert" : true});
+}
+
+function rejectDoc(doc, extensionFilter){
+    //if (doc.contentType != "file"){
+    if (doc.kind != "File"){
+        return true;
+    }
+    if( doc.original.file.size > 2500000){
+        return true;
+    }
+    if (extensionFilter){
+        if (!Collection.contains(extensionFilter, doc.original.file.rawExtension)){
+            return true;
+        }
+    }
+    return false;
+}
+
+function getNiveau(path){
+    var matches = String.allMatches(path, "\\\\");
+    var totalmatches = Collection.length(matches);
+    return totalmatches;
+}
+
+function docContainsOneOf(controleList, doc){
+    doc = String.toLower(doc);
+    foreach (item in controleList){
+        if(String.contains(doc, String.toLower(item))){
+            return item;
+        }
+    }
+    return false;
+}
+
+function categoryCheck (text, category, checkList){
+    var checkCount = 0 ;
+    text = String.toLower(text);
+    foreach (word in checkList[category]){
+        if (String.matches(text, ".*" :: word :: ".*")){
+            checkCount++;
+        }
+    }
+    if (checkCount >= Collection.length(checkList)-2 ){
+        return true;
+    }else{
+        return false;
+    }
+}
+
+function elfProef (number){
+    if (String.length(number)!= 9 && String.length(number) != 8){
+        return false;
+    }
+    if (String.length(number) == 8){
+        number = 0 :: number;
+    }
+    var d = String.allMatches(number, "\\d");
+    var sum =(d[0]*9)+(d[1]*8)+(d[2]*7)+(d[3]*6)+(d[4]*5)+(d[5]*4)+(d[6]*3)+(d[7]*2)+(d[8]*-1) ;
+    if (sum % 11 == 0){
+        return true;
+    }
+    return false;
+}

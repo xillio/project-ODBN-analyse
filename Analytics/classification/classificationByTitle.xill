@@ -1,0 +1,46 @@
+use Mongo, System, Excel, String, Collection, File, XURL;
+
+include classification.API.API as api;
+include classification.settings as set;
+
+var settings = set->settings();
+Mongo.connect(settings.database);
+
+var documents = Mongo.find(settings.collection, {}, {}, {"_id" : 1},{"noCursorTimeout" : 1});
+
+var countObject = {};
+var privacyDocuments = {};
+var count = 0;
+
+foreach (doc in documents){
+    if (api->rejectDoc(doc, false)){
+        continue;
+    }
+    count++;
+    if( count % 100 == 0 ) {
+        System.print("Processed " :: count :: " docs", "info"); 
+    }
+    
+    foreach (item in settings.searchList){
+        if (String.contains(String.toLower(doc._id), String.toLower(item))){ // checks if the file path contains any item from the controleList.
+            if (Collection.contains(settings.itemCheck, item)){ // checks if the names starts with id or cv 
+                var matchesList = String.allMatches(String.toLower(doc.original.file.name), String.toLower(item) :: "[ |\\.]");
+                if ( Collection.length(matchesList) == 0 || String.startsWith(String.toLower(doc.original.file.name), String.toLower(item)) == false){
+                    continue;
+                }
+            }
+            item = api->setSearchTerm(item, settings.titleTerms);
+            api->itemToUdm(doc, item);    
+            // count how many times an item from controleList exists. 
+            if (countObject[item] == null){
+                countObject[item] = 1;
+            }else{
+                countObject[item] ++;
+            }
+            privacyDocuments[doc._id] = item;
+            break;
+        }
+    }
+}
+
+System.print("done \n\r":: System.toJSON(countObject, true));

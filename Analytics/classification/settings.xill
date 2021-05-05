@@ -1,0 +1,103 @@
+use Mongo, System, Excel, String, Collection, File, XURL, Stream, Hash;
+
+include classification.API.API as api;
+
+var settings = {
+/*
+    * * *     mongo settings               * * *
+*/
+
+    "database" : "udm_odbn",
+    "collection" :"documents",
+    
+/*
+    * * *     udm settings               * * *
+*/
+    
+
+
+/*
+    * * *     search and control lists     * * *
+
+    In the titleTerms you put your category and the search terms, searchs only in the title.
+*/
+
+    "titleTerms" : {
+        "curriculum vitae"  : ["cv", "curriculum vitae","curriculum-vitae","curriculumvitae"],
+        "paspoort"          : ["passport", "paspoort"],
+        "identiteitskaart"  : ["id", "identiteit", "identity"],
+        "creditcard"        : [ "creditcard", "creditKaart", "credit-card", "credit-kaart", "credit card", "credit kaart", "mastercard", "master card", "master-card" ],
+        "bankpas"           : ["bankpas", "bank pas", "pinpas", "betaalpas"],
+        "rijbewijs"         : ["rijbewijs"],
+        "belasting"         : ["inkomstenbelasting", "belasting"] 
+    },
+    
+    
+/*
+    In the checkList you add a list with the values to validate a catorgory, it can have 2 misstakes to validate the check.
+    The fist item of the list must be a number. The number stand for how much misstakes the list can make to validate.  
+*/
+    "checkList" : {
+        "curriculum vitae"  : ["curriculum vitae","opleiding", "naam", "ering", "mail", "diploma"],
+        "paspoort"          : [1, "(passport|paspoort)","\\d{9}", "(names|naam)", "nederland", "(\\d{1,2}\\s*\\w{1,3}/\\w{1,3}\\s*\\d{1,4})", "burg", "(m/m|v/f)"],
+        "identiteitskaart"  : [1, "(identiteit|identity)", "\\d{9}", "(names|naam)", "nederland", "(\\d{1,2}\\s*\\w{1,3}/\\w{1,3}\\s*\\d{1,4})", "burg", "(m/m|v/f)"],
+        "creditcard"        : [1, "(valid|(\\d{2}/\\d{2}))", "\\d{4}\\s*\\d{4}\\s*\\d{4}\\s*\\d{4}", "(mastercard|visa|amex)"],
+        "bankpas"           : [1, "(iban|bank)", "(pasnummer|card nr)", "rekening", "nl\\d{2}\\s*\\w{4}\\s*\\d{4}\\s*\\d{4}\\s*\\d{2}"],
+        "rijbewijs"         : ["rijbewijs", "am-b","(\\d{1,2}\\.\\d{1,2}\\.\\d{1,4})", "\\d{10}", "gemeente" ]
+    },
+/*
+    object with categorie and list with regexs where you would like to search for in documents.
+*/
+    
+    "search" : {
+        "bsn"               : "\\b\\d{8,9}(?=\\s|$)",
+        "curriculum vitae"  : ["\\bcv\\b", "curriculum vitae","curriculum-vitae","curriculumvitae"],
+        "paspoort"          : ["passport", "paspoort"],
+        "identiteitskaart"  : ["\\bid\\b", "identiteit", "identity"],
+        "creditcard"        : [ "creditcard", "creditKaart", "credit-card", "credit-kaart", "credit card", "credit kaart", "mastercard", "master card", "master-card" ],
+        "bankpas"           : ["bankpas", "bank pas", "pinpas", "betaalpas"],
+        "rijbewijs"         : ["rijbewijs"],
+        "wachtwoord"        : ["password", "wachtwoord"]
+    },
+    
+    
+    
+/*    
+    * * *   ocr settings * * *
+
+
+    OCR nuance configuration
+    if ocr = true it will be used, if false it wouldn't be used. 
+    powerPdfConverterPath = the path to the batchconverter.com
+    ocrOutputDir = is the directory where the files while be saved after ocr. must be a full path!  they will be delete after they are used.
+    ocrList = is the extension list which, will go throw the ocrCheck. 
+    
+*/
+    "ocr" : true, 
+    "powerPdfConverterPath" : "C:/Program Files (x86)/Nuance/Power PDF 20/BatchConverter.com",
+    "ocrOutputDir" : "C:\\Users\\Xillio\\Documents\\Repos\\FSA-extra\\ocrOutputDir\\",
+    "ocrList" : ["png" , "jpg", " jpeg", "tif", "tiff", "pdf"],
+
+/*
+    special check for some search items.
+*/
+    "itemCheck" : ["id", "cv"],
+    
+/*
+    list with extension those will go throw the OCR system. 
+*/
+    "extensionFilter" : ["doc", "docx", "pdf" ,"png" , "jpg", " jpeg", "tif", "tiff" , "msg", "html", "htm", "tmp"],
+    
+/*
+    list of extension whose will be skipped.
+*/
+    "rejectExtensions" : ["zip", "avi", "mp3", "mp4", "gif", "flv", "ppt", "pptx", "exe", "dll", "db", "dot",  "cer", "hlp", "sig"],
+
+};
+
+
+function settings(){
+    settings.controleList = api->mergeList(settings.checkList);
+    settings.searchList   = api->mergeList(settings.titleTerms);
+    return settings;
+}

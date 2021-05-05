@@ -1,0 +1,52 @@
+use Mongo, System, Excel, String, Collection, File, XURL;
+
+include classification.API.API as api;
+include classification.settings as set;
+
+var settings = set->settings();
+var database = Mongo.connect(settings.database);
+
+var documents = Mongo.aggregate("report_classification_Title", [{"$group" : {"_id" : "$source.current.category", "count" : { "$sum" : 1}}}], {"noCursorTimeout" : 1}, database);
+
+var countObject = {};
+var path = "report/titleClassificationReport.xlsx";
+var row = 2;
+var categoryRow = 2;
+var workbook = Excel.createWorkbook(path);
+var overview = Excel.createSheet(workbook, "Overview");
+System.print ("Start creating report: "::path,"Info");
+foreach(category in documents){
+    Excel.setCellValue(overview, 1, 1, "category");
+    Excel.setCellValue(overview, 1, categoryRow, category._id);
+    Excel.setCellValue(overview, 2, 1, "aantal");
+    Excel.setCellValue(overview, 2, categoryRow, category.count);
+    createCategorySheet(category._id);
+    categoryRow++;
+    
+}
+
+function createCategorySheet(category){
+    var documents = Mongo.find("report_classification_Title",{"source.current.category" : category} , {}, {}, {"noCursorTimeout" : 1}, database);
+    var sheet = Excel.createSheet(workbook, category);
+    Excel.setCellValue(sheet, 1, 1, "category");
+    Excel.setCellValue(sheet, 2, 1, "niveau");
+    Excel.setCellValue(sheet, 3, 1, "name");
+    Excel.setCellValue(sheet, 4, 1, "size");
+    Excel.setCellValue(sheet, 5, 1, "extension");
+    Excel.setCellValue(sheet, 6, 1, "file path");
+    row = 2;
+    foreach (doc in documents){
+        var niveau = api->getNiveau(doc._id);
+        Excel.setCellValue(sheet, 1, row, doc.source.current.category);
+        Excel.setCellValue(sheet, 2, row, niveau);
+        Excel.setCellValue(sheet, 3, row, doc.source.current.name);
+        Excel.setCellValue(sheet, 4, row, doc.source.current.size);
+        Excel.setCellValue(sheet, 5, row, doc.source.current.extension);
+        Excel.setCellValue(sheet, 6, row, doc._id);
+        row++;
+    }
+}
+
+Excel.save(workbook, path);
+Excel.save(workbook, path);
+System.print ("done");
