@@ -1,0 +1,70 @@
+use System, Date, String, Collection, Mongo, Assert, Properties, File, Stream, Concurrency;
+
+include Settings as Settings;
+include Commons as Commons;
+//-------------------------------------------------------------------------
+//						  SETUP
+//-------------------------------------------------------------------------
+
+var concurrencyRoot = "project/concurrency";
+var pluginRoot = "plugins/pipe/source";
+
+//-------------------------------------------------------------------------
+//						  EXPORT
+//-------------------------------------------------------------------------
+argument std;
+var stdString;
+if(std != null){
+    var stdString = Stream.readLine(std.input);
+}
+
+var settings = Settings->getSettings(stdString);
+
+// Start concurrent category extraction
+foreach(name, repositorySettings in settings.repositories){
+    
+    repositorySettings = Commons->initRepository(repositorySettings, name);
+    
+    if(repositorySettings.enabled == true && repositorySettings.type == "pipe"){
+    
+        System.print("Start running connector: " :: repositorySettings.type :: " for " :: name, "INFO");
+        
+        extract(repositorySettings);
+        
+        System.print("Finished running connector: " :: repositorySettings.type :: " for " :: name, "INFO");
+    }else{
+        
+        System.print("Skipped connector type: " :: repositorySettings.type :: " for " :: name :: ". enbled = " :: repositorySettings.enabled, "INFO");
+    }
+}
+
+//-------------------------------------------------------------------------
+//						  FUNCTIONS
+//-------------------------------------------------------------------------
+
+function extract(repositorySettings) {
+    
+    Concurrency.run([
+        // Provider
+        {
+            "robot": pluginRoot :: "/Extract.xill",
+            "config": {
+                "path": repositorySettings.config.path,
+                "source":repositorySettings.config.source
+            },
+            "threadCount": 1,
+        },
+        {
+            "robot": concurrencyRoot :: "/StoreDocument.xill",
+            "config" : {
+                "mongo" : repositorySettings.mongo,
+                "source": repositorySettings.config.source
+            }
+        },
+        {
+            "robot": concurrencyRoot :: "/PrintProcessed.xill",
+            "config": {},
+            "threadCount": 1,
+        }
+    ]);
+}

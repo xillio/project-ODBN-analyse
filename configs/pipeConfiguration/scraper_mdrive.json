@@ -19,13 +19,13 @@
       "type": "jsonlineWriter",
       "preClean" : "true",
       "filePrefix": "files",
-      "outputDir" : "F:/data/pipe/extract/test/files" 
+      "outputDir" : "F:/data/pipe/extract/test/files1" 
     },
     "folders": {
       "type": "jsonlineWriter",
       "filePrefix": "folders",
       "preClean" : "true",
-     "outputDir" : "F:/data/pipe/extract/test/files" 
+     "outputDir" : "F:/data/pipe/extract/test/folders" 
     },
     "errors": {
       "type": "jsonlineWriter",
@@ -34,4 +34,4 @@
       "outputDir" : "F:/data/pipe/extract/test/errors" 
     }
   }
-}
+} 

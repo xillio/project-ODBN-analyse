@@ -21,7 +21,8 @@ var item = Concurrency.pop(data.input);
 while(item != null) {
     
     if( item.path && item.udm ) {
-        var document = extract->storeDocument(item);
+
+        var document = extract->storeDocument(item,data.mongo,data.source);
         
         // Push to next stage
         Concurrency.push(document, data.output);

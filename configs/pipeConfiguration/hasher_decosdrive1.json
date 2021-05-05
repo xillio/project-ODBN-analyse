@@ -1,0 +1,38 @@
+{
+  "modules": {
+    "getFiles": {
+      "type": "jsonlineReader",
+      "inputDir":"F:/data/pipe/extract/decosdrive/files1",
+      "filePrefix": "files",
+      "outputTo": [
+        "hasher"
+      ]
+    },
+    "hasher": {
+      "type": "hasher",
+      "perCore": true,
+      "concurrency": 1,
+      "hashes": [
+        "MD5"
+      ],
+      "outputTo": [
+        "output"
+      ],
+      "errorsTo" : [
+        "errors" 
+      ]
+    },
+    "output": {
+      "type": "jsonlineWriter",
+       "preClean" : "false",
+      "filePrefix": "hashed1",
+      "outputDir" : "F:/data/pipe/hashed/decosdrive/files" 
+    },
+    "errors": {
+      "type": "jsonlineWriter",
+      "filePrefix": "errors1",
+      "preClean" : "false",
+      "outputDir" : "F:/data/pipe/hashed/decosdrive/errors" 
+    }
+  }
+}

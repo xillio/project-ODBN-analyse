@@ -1,0 +1,43 @@
+/*
+ * Loads the configuration (config.json for the project and return it as a settings object
+ */
+ 
+use File, Stream, System, String, Collection;
+
+function getSettings(){
+    return getSettings(null);
+}
+
+function getSettings(repositories){
+    var settings = {};
+    
+    if(repositories == null || repositories == ""){
+        repositories = "repositories";
+    }
+    
+    var config = System.parseJSON(Stream.getText(File.openRead("config.json")));
+    
+    settings["configFolder"] = config.configFolder;
+    
+    var configs = File.iterateFiles(config.configFolder, false);
+    foreach(config in configs){
+        if(String.endsWith(config, ".json")){
+            var name = pathToName(config);
+            if(name == repositories){
+                settings["repositories"] = System.parseJSON(Stream.getText(File.openRead(config)));
+            }
+            else
+            {
+                settings[name] = System.parseJSON(Stream.getText(File.openRead(config)));
+            }
+        }
+    }
+    
+    return settings;
+}
+
+function pathToName(path) {
+     path = String.replace(path, "(.*[/\\\\])(.*)", "$2");
+     path = String.replace(path, "(\\.[\\-0-9a-zA-Z]+)$", "");
+     return path;
+}

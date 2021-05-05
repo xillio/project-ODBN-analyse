@@ -1,0 +1,40 @@
+{ 
+	"m-drive" : {
+        "type" : "pipe",
+        "config": {
+            "xillioPipe" : {
+                "host" : "http://localhost:5050"
+            },
+            "pipeline" : "scraper",
+            "path" : "F:/data/pipe/hashed/m-drive/files",
+            "startPipeline" : false
+        },
+        "mongo" : {
+            "port":27017,
+            "host":"localhost",
+            "username":null,
+            "password":null,
+            "name":"udm_odbn",
+            "collection":"documents"
+        }
+	} ,
+	"decosdrive" : {
+        "type" : "pipe",
+        "config": {
+            "xillioPipe" : {
+                "host" : "http://localhost:5050"
+            },
+            "pipeline" : "scraper",
+            "path" : "F:/data/pipe/hashed/decosdrive/files",
+            "startPipeline" : false
+        },
+        "mongo" : {
+            "port":27017,
+            "host":"localhost",
+            "username":null,
+            "password":null,
+            "name":"udm_odbn",
+            "collection":"documents"
+        }
+	} 
+}
