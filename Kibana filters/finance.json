@@ -1,0 +1,69 @@
+{
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/72365595 Monique Z117665*"
+            }
+          }
+        },
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Activiteitenbesluit*"
+            }
+          }
+        },
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/astrid INFORMATIEPLICHT ENERGIE*"
+            }
+          }
+        },
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/BVB Actualisatie*"
+            }
+          }
+        },
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Evaluatierapport Koninginnedijk*"
+            }
+          }
+        },
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/VvC archief*"
+            }
+          }
+        },
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/werkmap cap tool team financiën*"
+            }
+          }
+        },
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Werkmap stafwerkzaamheden/00_Stafwerkzaamheden _algemeen*"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+
+
+
+

@@ -1,0 +1,30 @@
+#oud/archief/vervallen
+{
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "*oud*"
+            }
+          }
+        },
+		 {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "*archief*"
+            }
+          }
+        },
+		 {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "*vervallen*"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

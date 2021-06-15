@@ -1,0 +1,130 @@
+{
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Centric_Key2Fin/*"
+            }
+          }
+        },
+		{
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Decos/*"
+            }
+          }
+        },
+		{
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Handleiding*"
+            }
+          }
+        },
+		{
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/IM nieuw*"
+            }
+          }
+        },
+		{
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Informatieuitwisseling*"
+            }
+          }
+        },
+		{
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Motion*"
+            }
+          }
+        },
+		{
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Motion*"
+            }
+          }
+        },
+		{
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Omgevingswet*"
+            }
+          }
+        },
+		{
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Project Dashboard*"
+            }
+          }
+        },
+		{
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/DLP*"
+            }
+          }
+        },
+		{
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/BB/Medewerkers*"
+            }
+          }
+        },
+		{
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Project Dashboard*"
+            }
+          }
+        },
+		{
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Bedrijfvoering/360ICT*"
+            }
+          }
+        },
+		{
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Bedrijfvoering/Bedrijvenlijst 2021*"
+            }
+          }
+        },
+		{
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Bedrijfvoering/Informatiemanagement*"
+            }
+          }
+        },
+		{
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Bedrijfvoering/UPDATE JOIN CLIENT*"
+            }
+          }
+        },
+		{
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Bedrijfvoering/zgw*"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+
+

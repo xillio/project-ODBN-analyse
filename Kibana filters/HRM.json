@@ -1,0 +1,29 @@
+{
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Arbo/*"
+            }
+          }
+        },
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/HRM nieuw/*"
+            }
+          }
+        },
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Bedrijfvoering/Inhuur p&o fin/Esmiralda*"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

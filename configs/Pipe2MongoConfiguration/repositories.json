@@ -16,6 +16,8 @@
             "password":null,
             "name":"udm_odbn",
             "collection":"documents"
+        },"reports":{
+            "reportPath":"F:/data/reports"
         }
 	} ,
 	"decosdrive" : {
@@ -35,6 +37,8 @@
             "password":null,
             "name":"udm_odbn",
             "collection":"documents"
+        },"reports":{
+            "reportPath":"F:/data/reports"
         }
 	} 
 }

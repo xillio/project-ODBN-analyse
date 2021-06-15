@@ -1,0 +1,9 @@
+   "enabledAnalysisTypes" : [
+       "classification",
+       "structure", 
+       "structureperyear", 
+       "duplicate", 
+       "emptycontainer", 
+       "sameparent", 
+       "links"
+       ],

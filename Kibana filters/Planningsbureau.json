@@ -1,0 +1,46 @@
+{
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Bedrijfvoering/*"
+            }
+          }
+        },
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/CPB/*"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+EXCLUDE
+{
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Bedrijfvoering/IM - Financi*"
+            }
+          }
+        },
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Bedrijfvoering/Financien/Advies/Salarisadministratie*"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

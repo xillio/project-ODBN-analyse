@@ -1,0 +1,22 @@
+{
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Zaakadministratie*"
+            }
+          }
+        },
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Team Zaakadministratie*"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

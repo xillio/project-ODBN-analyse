@@ -1,0 +1,15 @@
+{
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Werkmap stafwerkzaamheden/Managementondersteuning/*"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

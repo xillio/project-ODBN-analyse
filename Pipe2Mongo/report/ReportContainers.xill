@@ -12,7 +12,7 @@ var collection;
 var reportName = "ReportContainers";
 var path;
 var workbook;
-var maxDepth = 3;
+var maxDepth = 25;
 
 var settings = Settings->getSettings();
 

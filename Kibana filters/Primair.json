@@ -1,0 +1,69 @@
+{
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Financiën nieuw/*"
+            }
+          }
+        },
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Facturatie*"
+            }
+          }
+        },
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Bedrijfvoering/Inhuur p&o fin/*"
+            }
+          }
+        },
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Bedrijfvoering/VPB/*"
+            }
+          }
+        },
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Financiën nieuw*"
+            }
+          }
+        },
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/VvC archief*"
+            }
+          }
+        },
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/werkmap cap tool team financiën*"
+            }
+          }
+        },
+        {
+          "wildcard": {
+            "hierarchy.keyword": {
+              "value": "M:/Werkmap stafwerkzaamheden/00_Stafwerkzaamheden _algemeen*"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+
+
+
+

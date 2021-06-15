@@ -3,13 +3,7 @@
    "excludedRepositories" : [],
    "analysisRepositories" : [],
    "enabledAnalysisTypes" : [
-       "classification",
-       "structure", 
-       "structureperyear", 
-       "duplicate", 
-       "emptycontainer", 
-       "sameparent", 
-       "links"
+       "sameparent"
        ],
    "elasticsearch":{
       "host":"http://localhost:9200",

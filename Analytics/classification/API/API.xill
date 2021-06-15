@@ -51,7 +51,7 @@ function itemToUdm(doc, item){
 
 function rejectDoc(doc, extensionFilter){
     //if (doc.contentType != "file"){
-    if (doc.kind != "File"){
+    if (doc.kind != "Document"){
         return true;
     }
     if( doc.original.file.size > 2500000){
