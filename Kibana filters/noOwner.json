@@ -1,0 +1,78 @@
+{
+	"query": {
+		"bool": {
+			"should": [
+				{
+					"wildcard": {
+						"hierarchy.keyword": {
+							"value": "M:/Bedrijfvoering/MJOP*"
+						}
+					}
+				},
+				{
+					"wildcard": {
+						"hierarchy.keyword": {
+							"value": "M:/Werkmap stafwerkzaamheden/10_Huisvesting/07_1ste fase herinrichting de vliert*"
+						}
+					}
+				},
+				{
+					"wildcard": {
+						"hierarchy.keyword": {
+							"value": "M:/Bedrijfvoering/DIV/EXPORT CGM/*"
+						}
+					}
+				},
+				{
+					"wildcard": {
+						"hierarchy.keyword": {
+							"value": "M:/ExchangeSites/KwaliteitNieuw*"
+						}
+					}
+				},
+				{
+					"wildcard": {
+						"hierarchy.keyword": {
+							"value": "M:/directie/mt/2004/vergadering MT 04-08-30/Welkom op de site Aarhus_nl_bestanden/top_bestanden*"
+						}
+					}
+				},
+				{
+					"wildcard": {
+						"hierarchy.keyword": {
+							"value": "M:/Bedrijfvoering/Actielijst staf-overleggen/Financiën/Salarisadministratie/Mutaties 2019*"
+						}
+					}
+				},
+				{
+					"wildcard": {
+						"hierarchy.keyword": {
+							"value": "M:/directie/*"
+						}
+					}
+				},
+				{
+					"wildcard": {
+						"hierarchy.keyword": {
+							"value": "M:/Bedrijfvoering/Actielijst staf-overleggen*"
+						}
+					}
+				},
+				{
+					"wildcard": {
+						"hierarchy.keyword": {
+							"value": "M:/Derogatierapport 2018-2019 Gerald*"
+						}
+					}
+				},
+				{
+					"wildcard": {
+						"hierarchy.keyword": {
+							"value": "M:/Opleiding Bedrijfsvoering voor managers*"
+						}
+					}
+				}
+			]
+		}
+	}
+}

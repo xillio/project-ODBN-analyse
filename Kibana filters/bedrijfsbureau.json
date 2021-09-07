@@ -1,0 +1,36 @@
+{
+	"query": {
+		"bool": {
+			"should": [
+				{
+					"wildcard": {
+						"hierarchy.keyword": {
+							"value": "M:/Bedrijfvoering/Financien/Advies/Salarisadministratie*"
+						}
+					}
+				},
+				{
+					"wildcard": {
+						"hierarchy.keyword": {
+							"value": "M:/Projecten Prince2*"
+						}
+					}
+				},
+				{
+					"wildcard": {
+						"hierarchy.keyword": {
+							"value": "M:/ongeanonimiseerde bodemrapporten*"
+						}
+					}
+				},
+				{
+					"wildcard": {
+						"hierarchy.keyword": {
+							"value": "M:/BB*"
+						}
+					}
+				}
+			]
+		}
+	}
+}
